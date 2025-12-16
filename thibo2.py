@@ -30,7 +30,8 @@ tokens = 0
 has_metal_spear = False
 wood_damage = 1
 metal_damage = 3
-attack_range = 42
+diamond_damage = 10
+attack_range = 50
 attack_cd_ms = 300
 last_attack = -9999
 popup_msg = None
@@ -61,15 +62,19 @@ def make_weapon(x, y, wtype, speed=2):
 
 # Rooms
 rooms = {
+
     "lobby": {
         "color": (32, 12, 36),
         "doors": [
             {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110),
-             "target": "kitchen", "spawn": (120, HEIGHT//2)}
+             "target": "kitchen", "spawn": (120, HEIGHT//2)},
+            {"rect": pygame.Rect(WIDTH//2-40, 30, 80, 80),
+             "target": "dining_hall", "spawn": (WIDTH//2, HEIGHT-140)}
         ],
         "enemy": make_enemy(220, 180),
         "weapon": make_weapon(300, 300, "dagger")
     },
+
     "kitchen": {
         "color": (60, 25, 5),
         "doors": [
@@ -81,14 +86,124 @@ rooms = {
         "enemy": make_enemy(520, 340, hp=4),
         "weapon": make_weapon(420, 200, "axe")
     },
+
     "library": {
         "color": (5, 40, 62),
         "doors": [
             {"rect": pygame.Rect(WIDTH//2-40, HEIGHT-100, 80, 80),
-             "target": "kitchen", "spawn": (WIDTH-140, HEIGHT//2)}
+             "target": "kitchen", "spawn": (WIDTH-140, HEIGHT//2)},
+            {"rect": pygame.Rect(30, 60, 80, 110),
+             "target": "laboratory", "spawn": (WIDTH-140, HEIGHT//2)}
         ],
         "enemy": make_enemy(380, 160, hp=5),
         "weapon": make_weapon(250, 250, "spear")
+    },
+
+    "dining_hall": {
+        "color": (80, 30, 20),
+        "doors": [
+            {"rect": pygame.Rect(WIDTH//2-40, HEIGHT-100, 80, 80),
+             "target": "lobby", "spawn": (WIDTH//2, 140)},
+            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110),
+             "target": "throne_room", "spawn": (120, HEIGHT//2)}
+        ],
+        "enemy": make_enemy(400, 300, hp=4),
+        "weapon": make_weapon(350, 220, "mace")
+    },
+
+    "throne_room": {
+        "color": (90, 20, 20),
+        "doors": [
+            {"rect": pygame.Rect(30, HEIGHT//2-55, 80, 110),
+             "target": "dining_hall", "spawn": (WIDTH-140, HEIGHT//2)},
+            {"rect": pygame.Rect(WIDTH//2-40, 30, 80, 80),
+             "target": "treasury", "spawn": (WIDTH//2, HEIGHT-140)}
+        ],
+        "enemy": make_enemy(420, 220, hp=6),
+        "weapon": make_weapon(400, 260, "longsword")
+    },
+
+    "treasury": {
+        "color": (120, 110, 40),
+        "doors": [
+            {"rect": pygame.Rect(WIDTH//2-40, HEIGHT-100, 80, 80),
+             "target": "throne_room", "spawn": (WIDTH//2, 140)}
+        ],
+        "enemy": make_enemy(300, 200, hp=7),
+        "weapon": make_weapon(260, 240, "golden_sword")
+    },
+
+    "armory": {
+        "color": (70, 70, 70),
+        "doors": [
+            {"rect": pygame.Rect(30, HEIGHT//2-55, 80, 110),
+             "target": "barracks", "spawn": (WIDTH-140, HEIGHT//2)}
+        ],
+        "enemy": make_enemy(350, 250, hp=5),
+        "weapon": make_weapon(320, 200, "halberd")
+    },
+
+    "barracks": {
+        "color": (50, 50, 60),
+        "doors": [
+            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110),
+             "target": "armory", "spawn": (120, HEIGHT//2)}
+        ],
+        "enemy": make_enemy(300, 300, hp=4),
+        "weapon": make_weapon(260, 260, "shield")
+    },
+
+    "chapel": {
+        "color": (180, 180, 200),
+        "doors": [
+            {"rect": pygame.Rect(WIDTH//2-40, HEIGHT-100, 80, 80),
+             "target": "crypt", "spawn": (WIDTH//2, 140)}
+        ],
+        "enemy": make_enemy(420, 200, hp=5),
+        "weapon": make_weapon(380, 240, "holy_staff")
+    },
+
+    "crypt": {
+        "color": (20, 20, 20),
+        "doors": [
+            {"rect": pygame.Rect(WIDTH//2-40, 30, 80, 80),
+             "target": "chapel", "spawn": (WIDTH//2, HEIGHT-140)},
+            {"rect": pygame.Rect(30, HEIGHT//2-55, 80, 110),
+             "target": "catacombs", "spawn": (WIDTH-140, HEIGHT//2)}
+        ],
+        "enemy": make_enemy(300, 220, hp=6),
+        "weapon": make_weapon(260, 260, "bone_blade")
+    },
+
+    "catacombs": {
+        "color": (15, 15, 30),
+        "doors": [
+            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110),
+             "target": "crypt", "spawn": (120, HEIGHT//2)},
+            {"rect": pygame.Rect(WIDTH//2-40, HEIGHT-100, 80, 80),
+             "target": "secret_room", "spawn": (WIDTH//2, 140)}
+        ],
+        "enemy": make_enemy(400, 300, hp=7),
+        "weapon": make_weapon(360, 260, "dark_dagger")
+    },
+
+    "secret_room": {
+        "color": (100, 0, 120),
+        "doors": [
+            {"rect": pygame.Rect(WIDTH//2-40, 30, 80, 80),
+             "target": "catacombs", "spawn": (WIDTH//2, HEIGHT-140)},
+            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110),
+             "target": "boss_room", "spawn": (120, HEIGHT//2)}
+        ],
+        "enemy": make_enemy(350, 200, hp=8),
+        "weapon": make_weapon(300, 240, "shadow_blade")
+    },
+
+    "boss_room": {
+        "color": (120, 0, 0),
+        "doors": [],
+        "enemy": make_enemy(400, 250, hp=15),
+        "weapon": make_weapon(400, 320, "legendary_sword")
     }
 }
 
@@ -239,11 +354,12 @@ while running:
     for ev in pygame.event.get():
         if ev.type == pygame.QUIT:
             running = False
+        elif ev.type == pygame.MOUSEBUTTONDOWN:
+            if ev.button == 1:  # 1 = linkermuisknop
+                try_attack()
 
     keys = pygame.key.get_pressed()
     handle_input(keys)
-    if keys[pygame.K_SPACE]:
-        try_attack()
 
     update_enemy()
     update_weapon()
@@ -253,6 +369,44 @@ while running:
     draw_player()
     draw_hud()
     process_collisions(keys)
+
+
+
+    if hp <= 0:
+        # Game over scherm
+        screen.fill(DARK)
+        over1 = title.render("Lander je zuigt", True, (255,200,200))
+        over2 = ui.render("Enter: opnieuw beginnen | Esc: afsluiten", True, WHITE)
+        screen.blit(over1, over1.get_rect(center=(WIDTH//2, HEIGHT//2 - 20)))
+        screen.blit(over2, over2.get_rect(center=(WIDTH//2, HEIGHT//2 + 24)))
+        pygame.display.flip()
+        waiting = True
+        while waiting:
+            for ev in pygame.event.get():
+                if ev.type == pygame.QUIT:
+                    waiting = False
+                    running = False
+            k = pygame.key.get_pressed()
+            if k[pygame.K_RETURN]:
+                # reset spel
+                player.update(WIDTH//2-20, HEIGHT//2-28, 40, 56)
+                hp = max_hp
+                tokens = 0
+                has_metal_spear = False
+                # respawn enemies
+                for name in rooms:
+                    rooms[name]["enemy"] = make_enemy(
+                        random.randint(120, WIDTH-160),
+                        random.randint(120, HEIGHT-160),
+                        hp=random.randint(2,4),
+                        speed=2
+                    )
+                current_room = "lobby"
+                waiting = False
+            elif k[pygame.K_ESCAPE]:
+                waiting = False
+                running = False
+
 
     pygame.display.flip()
     clock.tick(60)
