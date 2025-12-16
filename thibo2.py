@@ -205,14 +205,12 @@ while running:
     for ev in pygame.event.get():
         if ev.type == pygame.QUIT:
             running = False
+        elif ev.type == pygame.MOUSEBUTTONDOWN:
+            if ev.button == 1:  # 1 = linkermuisknop
+                try_attack()
 
     keys = pygame.key.get_pressed()
     handle_input(keys)
-    if keys[pygame.K_SPACE]:
-        try_attack()
-
-
-    
 
     update_enemy()
     draw_room(current_room)
@@ -220,10 +218,11 @@ while running:
     draw_hud()
     process_collisions(keys)
 
+
     if hp <= 0:
         # Game over scherm
         screen.fill(DARK)
-        over1 = title.render("Hahahahhaha Nassim is verloren", True, (255,200,200))
+        over1 = title.render("Hahahahhaha Tang is verloren", True, (255,200,200))
         over2 = ui.render("Enter: opnieuw beginnen | Esc: afsluiten", True, WHITE)
         screen.blit(over1, over1.get_rect(center=(WIDTH//2, HEIGHT//2 - 20)))
         screen.blit(over2, over2.get_rect(center=(WIDTH//2, HEIGHT//2 + 24)))
