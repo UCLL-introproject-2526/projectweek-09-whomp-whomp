@@ -41,13 +41,13 @@ candles = [
 
 # --- Functies ---
 def move_player(keys, pos):
-    if keys[pygame.K_w]:
+    if keys[pygame.K_UP]:
         pos[1] -= player_speed
-    if keys[pygame.K_s]:
+    if keys[pygame.K_DOWN]:
         pos[1] += player_speed
-    if keys[pygame.K_a]:
+    if keys[pygame.K_LEFT]:
         pos[0] -= player_speed
-    if keys[pygame.K_d]:
+    if keys[pygame.K_RIGHT]:
         pos[0] += player_speed
     # Grenzen van scherm
     pos[0] = max(0, min(WIDTH - player_size, pos[0]))
