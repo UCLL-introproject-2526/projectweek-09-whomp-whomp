@@ -90,33 +90,114 @@ rooms = {
         "color": (55, 188, 31),
         "doors": [
             {"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "lobby", "spawn": (2, HEIGHT//2)},
-        ], 
+        ],
         "enemies": [],
     },
+
     "lobby": {
         "color": (32, 12, 36),
         "doors": [
-            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110), "target": "kitchen", "spawn": (WIDTH//2, HEIGHT//2)}
+            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110), "target": "kitchen", "spawn": (WIDTH//2, HEIGHT//2)},
+            {"rect": pygame.Rect(30, HEIGHT//2-55, 80, 110), "target": "hallway", "spawn": (WIDTH-140, HEIGHT//2)},
         ],
         "enemies": make_enemies(random.randint(1, 2), 10),
     },
+
+    "hallway": {
+        "color": (80, 80, 80),
+        "doors": [
+            {"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "armory", "spawn": (WIDTH//2, HEIGHT-140)},
+            {"rect": pygame.Rect(WIDTH//2-40, HEIGHT-100, 80, 80), "target": "lobby", "spawn": (WIDTH//2, 120)},
+        ],
+        "enemies": make_enemies(random.randint(1, 3), 8),
+    },
+
     "kitchen": {
         "color": (60, 25, 5),
         "doors": [
             {"rect": pygame.Rect(30, HEIGHT//2-55, 80, 110), "target": "lobby", "spawn": (WIDTH-140, HEIGHT//2)},
-            {"rect": pygame.Rect(WIDTH-110, 60, 80, 110), "target": "library", "spawn": (WIDTH//2, HEIGHT-140)}
+            {"rect": pygame.Rect(WIDTH-110, 60, 80, 110), "target": "library", "spawn": (WIDTH//2, HEIGHT-140)},
         ],
         "enemies": make_enemies(random.randint(2, 5), 5),
     },
+
     "library": {
         "color": (5, 40, 62),
         "doors": [
-            {"rect": pygame.Rect(WIDTH//2-40, HEIGHT-100, 80, 80),
-             "target": "kitchen", "spawn": (WIDTH-140, HEIGHT//2)}
+            {"rect": pygame.Rect(WIDTH//2-40, HEIGHT-100, 80, 80), "target": "kitchen", "spawn": (WIDTH//2, 120)},
+            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110), "target": "study", "spawn": (120, HEIGHT//2)},
         ],
         "enemies": make_enemies(random.randint(1, 3), 3),
-    }
+    },
+
+    "study": {
+        "color": (90, 60, 30),
+        "doors": [
+            {"rect": pygame.Rect(30, HEIGHT//2-55, 80, 110), "target": "library", "spawn": (WIDTH-140, HEIGHT//2)},
+            {"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "archive", "spawn": (WIDTH//2, HEIGHT-140)},
+        ],
+        "enemies": make_enemies(random.randint(2, 4), 4),
+    },
+
+    "archive": {
+        "color": (20, 20, 50),
+        "doors": [
+            {"rect": pygame.Rect(WIDTH//2-40, HEIGHT-100, 80, 80), "target": "study", "spawn": (WIDTH//2, 120)},
+        ],
+        "enemies": make_enemies(random.randint(3, 5), 3),
+    },
+
+    "armory": {
+        "color": (120, 120, 120),
+        "doors": [
+            {"rect": pygame.Rect(WIDTH//2-40, HEIGHT-100, 80, 80), "target": "hallway", "spawn": (WIDTH//2, 120)},
+            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110), "target": "barracks", "spawn": (120, HEIGHT//2)},
+        ],
+        "enemies": make_enemies(random.randint(2, 4), 6),
+    },
+
+    "barracks": {
+        "color": (100, 80, 60),
+        "doors": [
+            {"rect": pygame.Rect(30, HEIGHT//2-55, 80, 110), "target": "armory", "spawn": (WIDTH-140, HEIGHT//2)},
+            {"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "training_room", "spawn": (WIDTH//2, HEIGHT-140)},
+        ],
+        "enemies": make_enemies(random.randint(3, 6), 6),
+    },
+
+    "training_room": {
+        "color": (150, 50, 50),
+        "doors": [
+            {"rect": pygame.Rect(WIDTH//2-40, HEIGHT-100, 80, 80), "target": "barracks", "spawn": (WIDTH//2, 120)},
+        ],
+        "enemies": make_enemies(random.randint(4, 7), 5),
+    },
+
+    # --- FINAL WING ---
+    "crypt": {
+        "color": (30, 30, 30),
+        "doors": [
+            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110), "target": "chapel", "spawn": (120, HEIGHT//2)},
+        ],
+        "enemies": make_enemies(random.randint(4, 6), 4),
+    },
+
+    "chapel": {
+        "color": (200, 200, 160),
+        "doors": [
+            {"rect": pygame.Rect(30, HEIGHT//2-55, 80, 110), "target": "crypt", "spawn": (WIDTH-140, HEIGHT//2)},
+            {"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "boss_room", "spawn": (WIDTH//2, HEIGHT-140)},
+        ],
+        "enemies": make_enemies(random.randint(3, 5), 4),
+    },
+
+    "boss_room": {
+        "color": (120, 0, 0),
+        "doors": [],
+        "enemies": make_enemies(1, 1),
+    },
 }
+
 current_room = "starting_room"
 
 # --- Camera ---
