@@ -213,11 +213,11 @@ def switch_room(target, spawn):
 def handle_input(keys):
     global player_dir
     vx = vy = 0
-    if keys[pygame.K_LEFT] or keys[pygame.K_q]:
+    if keys[pygame.K_LEFT] or keys[pygame.K_a]:
         vx = -player_speed; player_dir = "left"
     if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
         vx = player_speed; player_dir = "right"
-    if keys[pygame.K_UP] or keys[pygame.K_z]:
+    if keys[pygame.K_UP] or keys[pygame.K_w]:
         vy = -player_speed; player_dir = "up"
     if keys[pygame.K_DOWN] or keys[pygame.K_s]:
         vy = player_speed; player_dir = "down"
