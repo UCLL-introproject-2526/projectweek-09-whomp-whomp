@@ -1,6 +1,6 @@
 import haunted_house
 
-import pygame
+import pygame 
 import sys
 import random
 
@@ -16,10 +16,10 @@ small_font = pygame.font.SysFont(None, 24)
 # speler
 player_size = (50, 70)
 player = pygame.Rect(WIDTH//2, HEIGHT//2, *player_size)
-player_speed = 5
+player_speed = 3
 player_color = (255, 0, 0)
-max_health = 3
-health = max_health
+max_health = 3 
+health = max_health 
 hit_cooldown_ms = 600
 last_hit_time = -9999
 
@@ -30,13 +30,26 @@ def make_enemy(x, y, w, h, speed):
     dy = random.choice([-1, 1]) * speed
     return {"rect": pygame.Rect(x, y, w, h), "dx": dx, "dy": dy}
 
+def draw_enemies(room):
+    for e in room["enemies"]:
+        pygame.draw.rect(screen, (100, 80, 210), e["rect"], border_radius=8)
+
 rooms = {
+    "starting room": {
+        "name": "starter room",
+        "color": (55, 188, 31),
+        "doors": [
+            {"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "lobby", "spawn": (120, HEIGHT//2)},
+        ],
+        "enemies": [make_enemy(200, 200, 40, 40, 3)],
+        "hazards": []
+    },
     "lobby": {
         "name": "Lobby",
         "color": (32, 12, 36),
         "doors": [
             {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110), "target": "kitchen", "spawn": (120, HEIGHT//2)},
-            {"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "library", "spawn": (WIDTH//2, HEIGHT-140)}
+            {"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "library", "spawn": (WIDTH//2, HEIGHT-140)},
         ],
         "enemies": [make_enemy(200, 200, 40, 40, 3)],
         "hazards": []
@@ -73,7 +86,7 @@ rooms = {
     }
 }
 
-current_room = "lobby"
+current_room = "starting room"
 
 def draw_door(rect, label):
     pygame.draw.rect(screen, (220, 190, 60), rect, border_radius=6)
@@ -85,7 +98,7 @@ def draw_health():
     for i in range(max_health):
         heart_color = (220, 60, 60) if i < health else (90, 40, 40)
         x = 20 + i * 32
-        y = 20
+        y = 60
         pygame.draw.circle(screen, heart_color, (x, y), 10)
         pygame.draw.circle(screen, heart_color, (x+12, y), 10)
         pygame.draw.polygon(screen, heart_color, [(x-6, y+6), (x+18, y+6), (x+6, y+22)])
@@ -155,6 +168,7 @@ while running:
     update_enemies(rooms[current_room])
 
     draw_room(current_room)
+    draw_enemies(rooms[current_room])
     draw_player()
     draw_health()
 
