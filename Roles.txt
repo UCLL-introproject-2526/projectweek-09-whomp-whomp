@@ -14,3 +14,5 @@ Thibo zorgd ervoor dat we geen blokken meer hebben als figuren maar figuren uit 
 maximilien zorgt voor nieuwe wapens, en damage idéeën. wapens worden verzamelt door speler alleen diamanten wapen is vrij uniek ingame en kan de vijand 3x zo snel doden als een gewoon metalen wapen.
 Thibo voegt critical hits, en startscherm toe, zodat het toffer wordt.
 Nassim ontwikkeld eindscherm met uitslagen als iemand dood is.
+
+dag3:
