@@ -1,16 +1,17 @@
 import pygame, sys, random
 pygame.init()
 
+# --- Scherm ---
 WIDTH, HEIGHT = 900, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Hotel Transylvania")
 clock = pygame.time.Clock()
 
-ROOM_WIDTH, ROOM_HEIGHT = 16000, 12000
-
+# --- Fonts ---
 ui = pygame.font.SysFont(None, 32)
 title = pygame.font.SysFont(None, 56)
 
+# --- Kleuren ---
 WHITE = (255,255,255)
 RED = (230,50,50)
 GREEN = (80,220,120)
@@ -18,7 +19,7 @@ YELLOW = (230,200,60)
 BROWN = (120,80,40)
 DARK = (20,10,22)
 
-# Player
+# --- Speler ---
 player = pygame.Rect(WIDTH//2-20, HEIGHT//2-28, 40, 56)
 player_speed = 5
 player_dir = "down"
@@ -27,20 +28,21 @@ hp = max_hp
 invul_ms = 500
 last_hit = -9999
 
-# Combat / progression
+# --- Combat / progression ---
 tokens = 0
 has_metal_spear = False
 wood_damage = 1
 metal_damage = 3
-diamond_damage = 10
 attack_range = 50
 attack_cd_ms = 300
 last_attack = -9999
 popup_msg = None
 popup_until = 0
 
-# Enemy helper
-def make_enemy(x, y, hp=3, speed=2,):
+player_name = ""
+
+# --- Enemy functies ---
+def make_enemy(x, y, hp=3, speed=2):
     return {
         "rect": pygame.Rect(x, y, 42, 42),
         "hp": hp,
@@ -50,56 +52,38 @@ def make_enemy(x, y, hp=3, speed=2,):
     }
 
 def make_enemies(amount, speed):
-    enemies = []
-    for _ in range(amount):
-        x = random.randint(50, WIDTH - 90)
-        y = random.randint(50, HEIGHT - 90)
-        enemies.append(make_enemy(x, y, hp=3, speed=speed))
-    return enemies
+    return [make_enemy(random.randint(50, WIDTH-90), random.randint(50, HEIGHT-90), hp=3, speed=speed) for _ in range(amount)]
 
-# Rooms
+# --- Rooms ---
 rooms = {
     "starting_room": {
         "color": (55, 188, 31),
         "doors": [
-            {"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "lobby", "spawn": (2, HEIGHT//2)},
-        ], 
-        "enemies": make_enemies(random.randint(0, 0), 0),
+            {"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "lobby", "spawn": (WIDTH//2, HEIGHT-100)}
+        ],
+        "enemies": []
     },
     "lobby": {
         "color": (32, 12, 36),
         "doors": [
-<<<<<<< HEAD
-            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110), "target": "kitchen", "spawn": (WIDTH//2, HEIGHT//2)}
-=======
-            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110),
-             "target": "keuken", "spawn": (120, HEIGHT//2)}
->>>>>>> e47e840de9ea41c3c3e8ec06fe6597812fdf21d8
+            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110), "target": "keuken", "spawn": (120, HEIGHT//2)}
         ],
-        "enemies": make_enemies(random.randint(1, 2), 10),
+        "enemies": make_enemies(random.randint(1, 2), 2)
     },
     "keuken": {
         "color": (60, 25, 5),
         "doors": [
-<<<<<<< HEAD
             {"rect": pygame.Rect(30, HEIGHT//2-55, 80, 110), "target": "lobby", "spawn": (WIDTH-140, HEIGHT//2)},
-            {"rect": pygame.Rect(WIDTH-110, 60, 80, 110), "target": "library", "spawn": (WIDTH//2, HEIGHT-140)}
-=======
-            {"rect": pygame.Rect(30, HEIGHT//2-55, 80, 110),
-             "target": "lobby", "spawn": (WIDTH-140, HEIGHT//2)},
-            {"rect": pygame.Rect(WIDTH-110, 60, 80, 110),
-             "target": "bibliotheek", "spawn": (WIDTH//2, HEIGHT-140)}
->>>>>>> e47e840de9ea41c3c3e8ec06fe6597812fdf21d8
+            {"rect": pygame.Rect(WIDTH-110, 60, 80, 110), "target": "bibliotheek", "spawn": (WIDTH//2, HEIGHT-140)}
         ],
-        "enemies": make_enemies(random.randint(2, 5), 5),
+        "enemies": make_enemies(random.randint(2, 5), 2)
     },
     "bibliotheek": {
         "color": (5, 40, 62),
         "doors": [
-            {"rect": pygame.Rect(WIDTH//2-40, HEIGHT-100, 80, 80),
-             "target": "keuken", "spawn": (WIDTH-140, HEIGHT//2)}
+            {"rect": pygame.Rect(WIDTH//2-40, HEIGHT-100, 80, 80), "target": "keuken", "spawn": (WIDTH-140, HEIGHT//2)}
         ],
-        "enemies": make_enemies(random.randint(1, 3), 3),
+        "enemies": make_enemies(random.randint(1,3), 1)
     }
 }
 current_room = "starting_room"
@@ -108,41 +92,54 @@ current_room = "starting_room"
 def get_camera():
     cam_x = player.centerx - WIDTH // 2
     cam_y = player.centery - HEIGHT // 2
-    # Clamp camera to room bounds
-    cam_x = max(0, min(cam_x, ROOM_WIDTH - WIDTH))
-    cam_y = max(0, min(cam_y, ROOM_HEIGHT - HEIGHT))
+    # Rooms zijn schermgrootte
+    cam_x = max(0, min(cam_x, WIDTH))
+    cam_y = max(0, min(cam_y, HEIGHT))
     return cam_x, cam_y
 
-# Startscherm
+# --- Naam invoeren ---
+def ask_player_name():
+    global player_name
+    player_name = ""
+    asking = True
+    while asking:
+        screen.fill(DARK)
+        text = ui.render("Voer je naam in: " + player_name, True, WHITE)
+        screen.blit(text, (WIDTH//2 - text.get_width()//2, HEIGHT//2))
+        pygame.display.flip()
+
+        for ev in pygame.event.get():
+            if ev.type == pygame.QUIT:
+                pygame.quit(); sys.exit()
+            if ev.type == pygame.KEYDOWN:
+                if ev.key == pygame.K_RETURN:
+                    if player_name == "":
+                        player_name = "Speler"
+                    asking = False
+                elif ev.key == pygame.K_BACKSPACE:
+                    player_name = player_name[:-1]
+                elif ev.unicode.isalnum() or ev.unicode in " -_":
+                    player_name += ev.unicode
+
+# --- Startscherm ---
 def show_start_screen():
     screen.fill(DARK)
-    title_text = title.render("Hotel Transylvania", True, WHITE)
-    info1 = ui.render("Gebruik ZQSD of pijltjes om te bewegen", True, WHITE)
-    info2 = ui.render("Linkermuisknop = aanvallen", True, WHITE)
-    info3 = ui.render("Versla monsters om tokens te verzamelen", True, WHITE)
-    info4 = ui.render("10 tokens = Metal spear upgrade", True, WHITE)
-    info5 = ui.render("Druk op ENTER om te starten", True, YELLOW)
-
-    screen.blit(title_text, title_text.get_rect(center=(WIDTH//2, HEIGHT//2 - 120)))
-    screen.blit(info1, info1.get_rect(center=(WIDTH//2, HEIGHT//2 - 40)))
-    screen.blit(info2, info2.get_rect(center=(WIDTH//2, HEIGHT//2)))
-    screen.blit(info3, info3.get_rect(center=(WIDTH//2, HEIGHT//2 + 40)))
-    screen.blit(info4, info4.get_rect(center=(WIDTH//2, HEIGHT//2 + 80)))
-    screen.blit(info5, info5.get_rect(center=(WIDTH//2, HEIGHT//2 + 160)))
-
+    screen.blit(title.render("Hotel Transylvania", True, WHITE), (WIDTH//2-200, HEIGHT//2-120))
+    screen.blit(ui.render("Gebruik ZQSD of pijltjes om te bewegen", True, WHITE), (WIDTH//2-180, HEIGHT//2-40))
+    screen.blit(ui.render("Linkermuisknop = aanvallen", True, WHITE), (WIDTH//2-150, HEIGHT//2))
+    screen.blit(ui.render("10 tokens = Metalen speer upgrade", True, WHITE), (WIDTH//2-160, HEIGHT//2+40))
+    screen.blit(ui.render("Druk op ENTER om te starten", True, YELLOW), (WIDTH//2-150, HEIGHT//2+160))
     pygame.display.flip()
-
     waiting = True
     while waiting:
         for ev in pygame.event.get():
             if ev.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                pygame.quit(); sys.exit()
             if ev.type == pygame.KEYDOWN:
-                if ev.key == pygame.K_RETURN:   # ENTER om te starten
+                if ev.key == pygame.K_RETURN:
                     waiting = False
 
-# HUD tekenen
+# --- Draw HUD ---
 def draw_hud():
     for i in range(max_hp):
         col = (220,60,60) if i < hp else (90,40,40)
@@ -157,16 +154,12 @@ def draw_hud():
         surf = ui.render(popup_msg, True, YELLOW)
         screen.blit(surf, (16, 80))
 
-<<<<<<< HEAD
+# --- Draw Room & Player ---
 def draw_room():
     room = rooms[current_room]
     cam_x, cam_y = get_camera()
-=======
-# Kamer tekenen
-def draw_room(name):
-    room = rooms[name]
->>>>>>> e47e840de9ea41c3c3e8ec06fe6597812fdf21d8
     screen.fill(room["color"])
+    # deuren
     for d in room["doors"]:
         draw_rect = d["rect"].copy()
         draw_rect.x -= cam_x
@@ -174,52 +167,57 @@ def draw_room(name):
         pygame.draw.rect(screen, YELLOW, draw_rect, border_radius=6)
         pygame.draw.rect(screen, BROWN, draw_rect, 3, border_radius=6)
         tag = ui.render(d["target"], True, WHITE)
-<<<<<<< HEAD
         screen.blit(tag, (draw_rect.centerx - tag.get_width()//2, draw_rect.top - 24))
-    # enemies
+    # vijanden
     for e in room["enemies"]:
         if e["hp"] > 0:
             draw_rect = e["rect"].copy()
             draw_rect.x -= cam_x
             draw_rect.y -= cam_y
             pygame.draw.rect(screen, GREEN, draw_rect, border_radius=6)
-      # player
+
+     # vijand HP bar
+            bar_w = draw_rect.width
+            hp_ratio = e["hp"] / e["max_hp"]
+            hp_w = int(bar_w * hp_ratio)
+            bar_x = draw_rect.x
+            bar_y = draw_rect.y - 10
+            pygame.draw.rect(screen, (60,60,60), (bar_x, bar_y, bar_w, 6))   # achtergrond
+            pygame.draw.rect(screen, (220,60,60), (bar_x, bar_y, hp_w, 6))   # HP
+    # speler
     draw_rect = player.copy()
     draw_rect.x -= cam_x
     draw_rect.y -= cam_y
     pygame.draw.rect(screen, RED, draw_rect, border_radius=10)
 
-def draw_enemies():
-    room = rooms[current_room]
-    cam_x, cam_y = get_camera()
+# --- Input ---
+def handle_input(keys):
+    global player_dir
+    vx = vy = 0
+    if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+        vx = -player_speed; player_dir = "left"
+    if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+        vx = player_speed; player_dir = "right"
+    if keys[pygame.K_UP] or keys[pygame.K_w]:
+        vy = -player_speed; player_dir = "up"
+    if keys[pygame.K_DOWN] or keys[pygame.K_s]:
+        vy = player_speed; player_dir = "down"
+    player.x += vx
+    player.y += vy
+    player.clamp_ip(pygame.Rect(0,0,WIDTH,HEIGHT))
+
+# --- Enemy Update ---
+def update_enemies():
     for e in rooms[current_room]["enemies"]:
         if e["hp"] > 0:
-            draw_rect = e["rect"].copy()
-            draw_rect.x -= cam_x
-            draw_rect.y -= cam_y
-            pygame.draw.rect(screen, GREEN, e["rect"], border_radius=6)
-=======
-        screen.blit(tag, (d["rect"].centerx - tag.get_width()//2, d["rect"].top - 24))
-    e = room["enemy"]
-    if e and e["hp"] > 0:
-        pygame.draw.rect(screen, GREEN, e["rect"], border_radius=6)
-        bar_w = e["rect"].width
-        hp_ratio = e["hp"] / e["max_hp"]
-        hp_w = int(bar_w * hp_ratio)
-        bar_x = e["rect"].x
-        bar_y = e["rect"].y - 10
-        pygame.draw.rect(screen, (60,60,60), (bar_x, bar_y, bar_w, 6))
-        pygame.draw.rect(screen, (220,60,60), (bar_x, bar_y, hp_w, 6))
->>>>>>> e47e840de9ea41c3c3e8ec06fe6597812fdf21d8
+            e["rect"].x += e["dx"]
+            e["rect"].y += e["dy"]
+            if e["rect"].left < 0 or e["rect"].right > WIDTH:
+                e["dx"] *= -1
+            if e["rect"].top < 0 or e["rect"].bottom > HEIGHT:
+                e["dy"] *= -1
 
-# Speler tekenen
-def draw_player():
-    cam_x, cam_y = get_camera()
-    draw_rect = player.copy()
-    draw_rect.x -= cam_x
-    draw_rect.y -= cam_y
-    pygame.draw.rect(screen, RED, player, border_radius=10)
-
+# --- Attack ---
 def attack_rect():
     r = player
     if player_dir == "up":
@@ -242,39 +240,17 @@ def try_attack():
     hb = attack_rect()
     for e in rooms[current_room]["enemies"]:
         if e["hp"] > 0 and hb.colliderect(e["rect"]):
-           e["hp"] -= current_damage()
-        if e["hp"] <= 0:
-            tokens += 1
-            popup_msg = "+1 token (monster verslagen)"
-            popup_until = now + 1500
-            if not has_metal_spear and tokens >= 10:
-                has_metal_spear = True
-                popup_msg = "Metalen speer vrijgespeeld!"
-                popup_until = now + 2000
-<<<<<<< HEAD
-        # attack flash
-    cam_x, cam_y = get_camera()
-    draw_rect = hb.copy()
-    draw_rect.x -= cam_x
-    draw_rect.y -= cam_y
-    pygame.draw.rect(screen, (255,220,120), draw_rect)
-    pygame.display.flip()
+            e["hp"] -= current_damage()
+            if e["hp"] <= 0:
+                tokens += 1
+                popup_msg = "+1 token (monster verslagen)"
+                popup_until = now + 1500
+                if not has_metal_spear and tokens >= 10:
+                    has_metal_spear = True
+                    popup_msg = "Metalen speer vrijgespeeld!"
+                    popup_until = now + 2000
 
-def update_enemies():
-    for e in rooms[current_room]["enemies"]:
-        if e["hp"] > 0:
-            e["rect"].x += e["dx"]
-            e["rect"].y += e["dy"]
-            if e["rect"].left < 0 or e["rect"].right > WIDTH:
-                e["dx"] *= -1
-            if e["rect"].top < 0 or e["rect"].bottom > HEIGHT:
-                e["dy"] *= -1
-=======
-        pygame.draw.rect(screen, (255,220,120), hb)
-        pygame.display.flip()
->>>>>>> e47e840de9ea41c3c3e8ec06fe6597812fdf21d8
-
-
+# --- Damage ---
 def handle_damage(amount=1):
     global hp, last_hit
     now = pygame.time.get_ticks()
@@ -284,8 +260,8 @@ def handle_damage(amount=1):
 
 def process_collisions(keys):
     for e in rooms[current_room]["enemies"]:
-     if e["hp"] > 0 and player.colliderect(e["rect"]):
-        handle_damage(1)
+        if e["hp"] > 0 and player.colliderect(e["rect"]):
+            handle_damage(1)
     for d in rooms[current_room]["doors"]:
         if player.colliderect(d["rect"]):
             hint = ui.render("E: betreed " + d["target"], True, WHITE)
@@ -298,60 +274,52 @@ def switch_room(target, spawn):
     current_room = target
     player.center = spawn
 
-def handle_input(keys):
-    global player_dir
-    vx = vy = 0
-    if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-        vx = -player_speed; player_dir = "left"
-    if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-        vx = player_speed; player_dir = "right"
-    if keys[pygame.K_UP] or keys[pygame.K_w]:
-        vy = -player_speed; player_dir = "up"
-    if keys[pygame.K_DOWN] or keys[pygame.K_s]:
-        vy = player_speed; player_dir = "down"
-    player.x += vx; player.y += vy
-    player.clamp_ip(pygame.Rect(0,0,ROOM_WIDTH,ROOM_HEIGHT))
+def show_game_over():
+    screen.fill(DARK)
+    over1 = title.render(f"Jammer {player_name}, je bent doodgegaan!", True, (255,200,200))
+    over2 = ui.render("Enter: opnieuw beginnen | Esc: afsluiten", True, WHITE)
+    screen.blit(over1, over1.get_rect(center=(WIDTH//2, HEIGHT//2-20)))
+    screen.blit(over2, over2.get_rect(center=(WIDTH//2, HEIGHT//2+24)))
+    pygame.display.flip()
 
-# Toon startscherm
+def reset_game():
+    global hp, tokens, has_metal_spear, current_room, player
+    hp = max_hp
+    tokens = 0
+    has_metal_spear = False
+    current_room = "starting_room"
+    player.center = (WIDTH//2, HEIGHT//2)
+    for name in rooms:
+        if name == "starting_room":
+            rooms[name]["enemies"] = []
+        else:
+            rooms[name]["enemies"] = make_enemies(random.randint(1,3), 2)
+
+# --- Start ---
+ask_player_name()
 show_start_screen()
 
-# Main loop
+# --- Main loop ---
 running = True
 while running:
     for ev in pygame.event.get():
         if ev.type == pygame.QUIT:
             running = False
-        elif ev.type == pygame.MOUSEBUTTONDOWN:
-            if ev.button == 1:
-                try_attack()
+        elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+            try_attack()
 
     keys = pygame.key.get_pressed()
     handle_input(keys)
-<<<<<<< HEAD
     if keys[pygame.K_SPACE]:
         try_attack()
 
     update_enemies()
     draw_room()
-=======
-    update_enemy()
-    draw_room(current_room)
-    draw_player()
->>>>>>> e47e840de9ea41c3c3e8ec06fe6597812fdf21d8
     draw_hud()
     process_collisions(keys)
 
     if hp <= 0:
-        screen.fill(DARK)
-<<<<<<< HEAD
-        over1 = title.render("Trash", True, (255,200,200))
-=======
-        over1 = title.render("Hahahahhaha Tang is verloren", True, (255,200,200))
->>>>>>> e47e840de9ea41c3c3e8ec06fe6597812fdf21d8
-        over2 = ui.render("Enter: opnieuw beginnen | Esc: afsluiten", True, WHITE)
-        screen.blit(over1, over1.get_rect(center=(WIDTH//2, HEIGHT//2 - 20)))
-        screen.blit(over2, over2.get_rect(center=(WIDTH//2, HEIGHT//2 + 24)))
-        pygame.display.flip()
+        show_game_over()
         waiting = True
         while waiting:
             for ev in pygame.event.get():
@@ -360,19 +328,7 @@ while running:
                     running = False
             k = pygame.key.get_pressed()
             if k[pygame.K_RETURN]:
-                # reset spel
-                player = pygame.Rect(WIDTH//2-20, HEIGHT//2-28, 40, 56)
-                hp = max_hp
-                tokens = 0
-                has_metal_spear = False
-                for name in rooms:
-                    if name == "starting_room":
-                        rooms[name]["enemies"] = []
-                    
-                    else:
-                        rooms[name]["enemies"] = make_enemies(random.randint(1,3),speed=2
-                    )
-                current_room = "starting_room"
+                reset_game()
                 waiting = False
             elif k[pygame.K_ESCAPE]:
                 waiting = False
