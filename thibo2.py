@@ -31,8 +31,6 @@ last_hit = -9999
 # --- Combat / progression ---
 tokens = 0
 has_metal_spear = False
-wood_damage = 1
-metal_damage = 3
 attack_range = 50
 attack_cd_ms = 300
 last_attack = -9999
@@ -40,6 +38,8 @@ popup_msg = None
 popup_until = 0
 
 player_name = ""
+current_room = "starting_room"
+current_weapon = None
 
 # --- Enemy functies ---
 def make_enemy(x, y, hp=3, speed=2):
@@ -66,33 +66,31 @@ rooms = {
     "lobby": {
         "color": (32, 12, 36),
         "doors": [
-            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110), "target": "keuken", "spawn": (120, HEIGHT//2)}
+            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110), "target": "kitchen", "spawn": (120, HEIGHT//2)}
         ],
         "enemies": make_enemies(random.randint(1, 2), 2)
     },
-    "keuken": {
+    "kitchen": {
         "color": (60, 25, 5),
         "doors": [
             {"rect": pygame.Rect(30, HEIGHT//2-55, 80, 110), "target": "lobby", "spawn": (WIDTH-140, HEIGHT//2)},
-            {"rect": pygame.Rect(WIDTH-110, 60, 80, 110), "target": "bibliotheek", "spawn": (WIDTH//2, HEIGHT-140)}
+            {"rect": pygame.Rect(WIDTH-110, 60, 80, 110), "target": "library", "spawn": (WIDTH//2, HEIGHT-140)}
         ],
         "enemies": make_enemies(random.randint(2, 5), 2)
     },
-    "bibliotheek": {
+    "library": {
         "color": (5, 40, 62),
         "doors": [
-            {"rect": pygame.Rect(WIDTH//2-40, HEIGHT-100, 80, 80), "target": "keuken", "spawn": (WIDTH-140, HEIGHT//2)}
+            {"rect": pygame.Rect(WIDTH//2-40, HEIGHT-100, 80, 80), "target": "kitchen", "spawn": (WIDTH-140, HEIGHT//2)}
         ],
         "enemies": make_enemies(random.randint(1,3), 1)
     }
 }
-current_room = "starting_room"
 
 # --- Camera ---
 def get_camera():
     cam_x = player.centerx - WIDTH // 2
     cam_y = player.centery - HEIGHT // 2
-    # Rooms zijn schermgrootte
     cam_x = max(0, min(cam_x, WIDTH))
     cam_y = max(0, min(cam_y, HEIGHT))
     return cam_x, cam_y
@@ -107,7 +105,6 @@ def ask_player_name():
         text = ui.render("Voer je naam in: " + player_name, True, WHITE)
         screen.blit(text, (WIDTH//2 - text.get_width()//2, HEIGHT//2))
         pygame.display.flip()
-
         for ev in pygame.event.get():
             if ev.type == pygame.QUIT:
                 pygame.quit(); sys.exit()
@@ -135,9 +132,8 @@ def show_start_screen():
         for ev in pygame.event.get():
             if ev.type == pygame.QUIT:
                 pygame.quit(); sys.exit()
-            if ev.type == pygame.KEYDOWN:
-                if ev.key == pygame.K_RETURN:
-                    waiting = False
+            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN:
+                waiting = False
 
 # --- Draw HUD ---
 def draw_hud():
@@ -175,15 +171,14 @@ def draw_room():
             draw_rect.x -= cam_x
             draw_rect.y -= cam_y
             pygame.draw.rect(screen, GREEN, draw_rect, border_radius=6)
-
-     # vijand HP bar
+            # HP bar
             bar_w = draw_rect.width
             hp_ratio = e["hp"] / e["max_hp"]
             hp_w = int(bar_w * hp_ratio)
             bar_x = draw_rect.x
             bar_y = draw_rect.y - 10
-            pygame.draw.rect(screen, (60,60,60), (bar_x, bar_y, bar_w, 6))   # achtergrond
-            pygame.draw.rect(screen, (220,60,60), (bar_x, bar_y, hp_w, 6))   # HP
+            pygame.draw.rect(screen, (60,60,60), (bar_x, bar_y, bar_w, 6))
+            pygame.draw.rect(screen, (220,60,60), (bar_x, bar_y, hp_w, 6))
     # speler
     draw_rect = player.copy()
     draw_rect.x -= cam_x
@@ -229,10 +224,10 @@ def attack_rect():
     return pygame.Rect(r.right, r.centery-8, attack_range, 16)
 
 def current_damage():
-    return metal_damage if has_metal_spear else wood_damage
+    return 3 if has_metal_spear else 1
 
 def try_attack():
-    global last_attack, tokens, has_metal_spear, popup_msg, popup_until
+    global last_attack, popup_msg, popup_until, tokens, has_metal_spear
     now = pygame.time.get_ticks()
     if now - last_attack < attack_cd_ms:
         return
@@ -263,11 +258,8 @@ def process_collisions(keys):
         if e["hp"] > 0 and player.colliderect(e["rect"]):
             handle_damage(1)
     for d in rooms[current_room]["doors"]:
-        if player.colliderect(d["rect"]):
-            hint = ui.render("E: betreed " + d["target"], True, WHITE)
-            screen.blit(hint, (16, HEIGHT-36))
-            if keys[pygame.K_e]:
-                switch_room(d["target"], d["spawn"])
+        if player.colliderect(d["rect"]) and keys[pygame.K_e]:
+            switch_room(d["target"], d["spawn"])
 
 def switch_room(target, spawn):
     global current_room

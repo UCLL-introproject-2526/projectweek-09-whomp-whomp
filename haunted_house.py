@@ -24,3 +24,9 @@ def main():
 
 pygame.quit
 main()
+
+class Player:
+    def __init__(self):
+        self.name = (f'name')
+        
+            
