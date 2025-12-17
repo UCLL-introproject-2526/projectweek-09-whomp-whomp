@@ -8,11 +8,15 @@ eerste zombies te doden met houten speer, ieder monster verslagen is 1 skill tok
 speler begint buiten, en vecht tot alle monsters dood zijn speler kan enkel op bepaalde checkpoint like; buiten in maze , binnen gelijkvloers, 1ste, 2de, 3de en vierde verdiep kamer1
 speler kan bij het bereiken van vloer 2 de krachten van eindebaas vloer 1 gebruiken zelfde per volgend verdiep alle krachten worden onthouden en herbruikbaar na verloop van tijd.
 dag 2:
-NGtang maakt random chamber locaties code.
+Tang maakt random chamber locaties code.
 Nassim maakt meerdere vijanden.
 Thibo zorgd ervoor dat we geen blokken meer hebben als figuren maar figuren uit film zelf en foto's.
-maximilien zorgt voor nieuwe wapens, en damage idéeën. wapens worden verzamelt door speler alleen diamanten wapen is vrij uniek ingame en kan de vijand 3x zo snel doden als een gewoon metalen wapen.
-Thibo voegt critical hits, en startscherm toe, zodat het toffer wordt.
+Maximilien zorgt voor nieuwe wapens, en damage idéeën. wapens worden verzamelt door speler alleen diamanten wapen is vrij uniek ingame en kan de vijand 3x zo snel doden als een gewoon metalen wapen.
+Thibo voegt critical hits, en startscherm toe, zodat het toffer wordt.o
 Nassim ontwikkeld eindscherm met uitslagen als iemand dood is.
 
 dag3:
+Thibo gaat vandaag mergen van alle filles in main.py
+Nassim zorgd dat alle foto's samen in 1mapje zitten in github.
+Tang maakt nog meer kamers aan.
+Lander Poster maken.
