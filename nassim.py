@@ -36,28 +36,39 @@ DIRECTION_ROW = {
     "left": 1,
     "right": 2,
     "up": 3
+
 }
+ENEMY_FRAME_W = 64
+ENEMY_FRAME_H = 64
+FRAMES_PER_ROW = 9
+ENEMY_HITBOX_W = 32
+ENEMY_HITBOX_H = 48
+
 ENEMY_DIRECTION_ROW = {
-    "up": 8,    # 0-indexed row 9
-    "left": 9,  # row 10
-    "down": 10, # row 11
-    "right": 11 # row 12
+    "up": 8,
+    "left": 9,
+    "down": 10,
+    "right": 11
 }
 
-# enemy sprite
-enemy_spritesheet = pygame.image.load(("img\skeleton.png")).convert_alpha()
-
-ENEMY_FRAME_WIDTH = 42   # width of a single frame
-ENEMY_FRAME_HEIGHT = 42  # height of a single frame
-FRAMES_PER_ROW = 9       # number of frames per walking animation row
+enemy_spritesheet = pygame.image.load("img\skeleton.png").convert_alpha()
 
 enemy_sprites = {}
-for dir_name, row in ENEMY_DIRECTION_ROW.items():
-    frames = []
-    for col in range(FRAMES_PER_ROW):
-        rect = pygame.Rect(col*ENEMY_FRAME_WIDTH, row*ENEMY_FRAME_HEIGHT, ENEMY_FRAME_WIDTH, ENEMY_FRAME_HEIGHT)
-        frames.append(enemy_spritesheet.subsurface(rect))
-    enemy_sprites[dir_name] = frames
+
+for direction, row in ENEMY_DIRECTION_ROW.items():
+    enemy_sprites[direction] = [
+        enemy_spritesheet.subsurface(
+            pygame.Rect(
+                col * ENEMY_FRAME_W,
+                row * ENEMY_FRAME_H,
+                ENEMY_FRAME_W,
+                ENEMY_FRAME_H
+            )
+        )
+        for col in range(FRAMES_PER_ROW)
+    ]
+
+
 
 #Animation
 player_frame = 0
@@ -121,26 +132,24 @@ popup_msg = None
 popup_until = 0
 
 # Enemy helper
+
 def make_enemy(x, y, hp=3, speed=2):
-    dir_choices = ["up", "down", "left", "right"]
-    initial_dir = random.choice(dir_choices)
     return {
-        "rect": pygame.Rect(x, y, ENEMY_FRAME_WIDTH, ENEMY_FRAME_HEIGHT),  # match sprite size
+        "rect": pygame.Rect(x, y, ENEMY_HITBOX_W, ENEMY_HITBOX_H),
         "hp": hp,
         "max_hp": hp,
-        "dx": speed,  # movement speed along normalized direction
-        "dy": speed,
-        "dir": initial_dir,
-        "frame": random.randint(0, FRAMES_PER_ROW-1),  # random start frame to avoid uniform movement
-        "animation_speed": 0.01  # tweak this for slower/faster animation
+        "speed": speed,
+        "dir": "down",
+        "frame": 0.0,
+        "animation_speed": 0.18,
     }
 
 
 def make_enemies(amount, speed):
     enemies = []
     for _ in range(amount):
-        x = random.randint(50, WIDTH - 90)
-        y = random.randint(50, HEIGHT - 90)
+        x = random.randint(WALL_THICKNESS + 100, ROOM_WIDTH - WALL_THICKNESS - 100)
+        y = random.randint(WALL_THICKNESS + 100, ROOM_HEIGHT - WALL_THICKNESS - 100)
         enemies.append(make_enemy(x, y, hp=3, speed=speed))
     return enemies
 
@@ -159,21 +168,21 @@ rooms = {
         "doors": [{"rect": pygame.Rect(100, 50, 70, 100), "target": "starting_room", "spawn": (200,200)},
                   {"rect": pygame.Rect(300, 50, 70, 100), "target": "hallway right", "spawn": (200,200)},
                   {"rect": pygame.Rect(500, 50, 70, 100), "target": "hallway left", "spawn": (200,200)}], 
-        "enemies": make_enemies(random.randint(20,50), speed=2), 
+        "enemies": make_enemies(random.randint(10, 50), 4), 
     },
 
     "hallway right": {
         "color": (41,90,96),
         "doors": [{"rect": pygame.Rect(WIDTH//2-40, 50, 70, 100), "target": "lobby", "spawn": (200,200)}
         ], 
-        "enemies": make_enemies(random.randint(1,2), speed=2), 
+        "enemies": make_enemies(random.randint(4, 6), 4), 
     },
 
      "hallway left": {
         "color": (41,90,96),
         "doors": [{"rect": pygame.Rect(WIDTH//2-40, 50, 70, 100), "target": "lobby", "spawn": (200,200)}
         ], 
-        "enemies": make_enemies(random.randint(1,2), speed=2), 
+        "enemies": make_enemies(random.randint(4, 6), 4), 
     },
 
     # --- FINAL WING ---
@@ -202,15 +211,6 @@ rooms = {
 }
 
 current_room = "starting_room"
-
-# Slice spritesheet into a dict of lists for each direction
-enemy_sprites = {}
-for dir_name, row in ENEMY_DIRECTION_ROW.items():
-    frames = []
-    for col in range(FRAMES_PER_ROW):
-        rect = pygame.Rect(col*ENEMY_FRAME_WIDTH, row*ENEMY_FRAME_HEIGHT, ENEMY_FRAME_WIDTH, ENEMY_FRAME_HEIGHT)
-        frames.append(enemy_spritesheet.subsurface(rect))
-    enemy_sprites[dir_name] = frames
 
 # ================= NAAM =================
 def show_start_screen_and_ask_name():
@@ -325,6 +325,8 @@ def draw_debug_hud():
         y += 20
 
 def draw_room():
+    screen.blit(floor_bg, (0,0))
+
     room = rooms[current_room]
     cam_x, cam_y = get_camera()
     screen.fill(room["color"])
@@ -338,20 +340,6 @@ def draw_room():
         pygame.draw.rect(screen, BROWN, draw_rect, 3, border_radius=6)
         tag = ui.render(d["target"], True, WHITE)
         screen.blit(tag, (draw_rect.centerx - tag.get_width()//2, draw_rect.top - 24))
-
-def draw_enemies():
-    room = rooms[current_room]
-    cam_x, cam_y = get_camera()
-    for e in rooms[current_room]["enemies"]:
-        if e["hp"] > 0:
-            draw_rect = e["rect"].copy()
-            draw_rect.x -= cam_x
-            draw_rect.y -= cam_y
-           # Optional: offset to center the sprite
-            draw_rect.x -= (img.get_width() - e["rect"].width)//2
-            draw_rect.y -= (img.get_height() - e["rect"].height)//2
-
-            screen.blit(img, draw_rect)
 
 def draw_enemy_health(e, cam_x, cam_y):
     if e["hp"] <= 0:
@@ -420,15 +408,6 @@ def move_player(vx, vy):
                 player_rect.top = wall.bottom
 
 
-# def update_enemies():
-#     for e in rooms[current_room]["enemies"]:
-#         if e["hp"] > 0:
-#             e["rect"].x += e["dx"]
-#             e["rect"].y += e["dy"]
-#             if e["rect"].left < 0 or e["rect"].right > WIDTH:
-#                 e["dx"] *= -1
-#             if e["rect"].top < 0 or e["rect"].bottom > HEIGHT:
-#                 e["dy"] *= -1
 def update_enemies():
     for e in rooms[current_room]["enemies"]:
         if e["hp"] <= 0:
@@ -439,8 +418,8 @@ def update_enemies():
         dy = player_rect.centery - e["rect"].centery
         dist = max(1, (dx*dx + dy*dy) ** 0.5)
 
-        move_x = int(e["dx"] * dx / dist)
-        move_y = int(e["dy"] * dy / dist)
+        move_x = int(e["speed"] * dx / dist)
+        move_y = int(e["speed"] * dy / dist)
         e["rect"].x += move_x
         e["rect"].y += move_y
 
@@ -529,24 +508,24 @@ def switch_room(target, spawn):
     player_rect.center = spawn
 
 def handle_input(keys):
-    global player_dir
+    global player_dir, player_frame
     vx = vy = 0
     moving = False
     if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-        vx = -player_speed; player_dir = "left"
+        vx = -player_speed; player_dir = "left"; moving = True
     if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-        vx = player_speed; player_dir = "right"
+        vx = player_speed; player_dir = "right"; moving = True
     if keys[pygame.K_UP] or keys[pygame.K_w]:
-        vy = -player_speed; player_dir = "up"
+        vy = -player_speed; player_dir = "up"; moving = True
     if keys[pygame.K_DOWN] or keys[pygame.K_s]:
-        vy = player_speed; player_dir = "down"
+        vy = player_speed; player_dir = "down"; moving = True
     
     move_player(vx, vy)
 
     if moving:
         player_frame += animation_speed
     else:
-        player_frame = 0
+        player_frame = int(player_frame)
 
 
 # Main loop

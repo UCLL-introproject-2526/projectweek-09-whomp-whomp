@@ -14,13 +14,13 @@ clock = pygame.time.Clock()
 WALL_THICKNESS = 30
 
 # ================= AFBEELDINGEN =================
-start_bg = pygame.image.load(os.path.join(IMG_DIR, "Startscherm.jpg")).convert()
+start_bg = pygame.image.load(("img\Startscherm.jpg")).convert_alpha()
 start_bg = pygame.transform.scale(start_bg, (WIDTH, HEIGHT))
 
-floor_bg = pygame.image.load(os.path.join(IMG_DIR, "stone floor.jpg")).convert()
+floor_bg = pygame.image.load(("img\stone.jpg")).convert_alpha()
 floor_bg = pygame.transform.scale(floor_bg, (WIDTH, HEIGHT))
 
-player_sheet = pygame.image.load("projectweek-09-whomp-whomp\img\player.png").convert_alpha()
+player_sheet = pygame.image.load("img\player.png").convert_alpha()
 
 # ================= FONTS =================
 ui = pygame.font.SysFont(None, 32)
