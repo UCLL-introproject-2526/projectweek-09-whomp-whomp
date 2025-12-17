@@ -421,10 +421,3 @@ pyrightconfig.json
 *.rar
 
 # End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode
-
-
-# Allow images in img folder
-!img/
-!img/*.png
-!img/*.jpg
-!img/*.jpeg
