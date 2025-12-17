@@ -1,4 +1,4 @@
-import pygame, sys, random, os
+import pygame, sys, random, os, json
 pygame.init()
 
 # ================= PADEN =================
@@ -17,11 +17,14 @@ WALL_THICKNESS = 30
 start_bg = pygame.image.load(os.path.join(IMG_DIR, "Startscherm.jpg")).convert()
 start_bg = pygame.transform.scale(start_bg, (WIDTH, HEIGHT))
 
-floor_bg = pygame.image.load(os.path.join(IMG_DIR, "stone floor.jpg")).convert()
-floor_bg = pygame.transform.scale(floor_bg, (WIDTH, HEIGHT))
+# background_bg = pygame.image.load(os.path.join(IMG_DIR, "roos.jpg")).convert()
+# background_bg = pygame.transform.scale(background_bg, (WIDTH, HEIGHT))
 
-door_img = pygame.image.load(os.path.join(IMG_DIR, "door3.jpg")).convert_alpha()
+door_img = pygame.image.load(os.path.join(IMG_DIR, "door3.jpg")).convert()
 door_img = pygame.transform.scale(door_img, (80, 110))
+
+skeleton_img = pygame.image.load(os.path.join(IMG_DIR, "skeleton.png")).convert_alpha()
+skeleton_img = pygame.transform.scale(skeleton_img, (42, 42))
 
 
 player_sheet = pygame.image.load("projectweek-09-whomp-whomp\img\player.png").convert_alpha()
@@ -101,6 +104,8 @@ def get_camera():
     cam_y = max(0, min(cam_y, ROOM_HEIGHT - HEIGHT))
     return cam_x, cam_y
 
+
+
 def draw_walls():
     cam_x, cam_y = get_camera()
     for wall in get_room_walls():
@@ -108,6 +113,39 @@ def draw_walls():
         draw_rect.x -= cam_x
         draw_rect.y -= cam_y
         pygame.draw.rect(screen, (70, 70, 70), draw_rect)
+
+def draw_hud():
+    for i in range(max_hp):
+        col = (220,60,60) if i < hp else (90,40,40)
+        x = 16 + i*22
+        pygame.draw.circle(screen, col, (x, 18), 8)
+        pygame.draw.circle(screen, col, (x+10, 18), 8)
+        pygame.draw.polygon(screen, col, [(x-5, 22), (x+15, 22), (x+5, 34)])
+
+    weapon = "Metal spear" if has_metal_spear else "Wooden spear"
+    info = f"Tokens: {tokens} | Weapon: {weapon}"
+    screen.blit(ui.render(info, True, WHITE), (16, 50))
+
+    if popup_msg and pygame.time.get_ticks() < popup_until:
+        screen.blit(ui.render(popup_msg, True, YELLOW), (16, 80))
+
+
+def draw_debug_hud():
+    cam_x, cam_y = get_camera()
+
+    lines = [
+        f"Room: {current_room}",
+        f"Player world pos: {player_rect.x}, {player_rect.y}",
+        f"Camera pos: {cam_x}, {cam_y}",
+        f"Room size: {ROOM_WIDTH} x {ROOM_HEIGHT}",
+    ]
+
+    y = HEIGHT - 20 * len(lines) - 10
+    for line in lines:
+        text = ui.render(line, True, (255, 255, 0))
+        screen.blit(text, (10, y))
+        y += 20
+
 
 def get_room_walls():
     return [
@@ -124,15 +162,79 @@ def get_room_walls():
         pygame.Rect(ROOM_WIDTH - WALL_THICKNESS, 0, WALL_THICKNESS, ROOM_HEIGHT),
     ]
 
+def draw_walls():
+    cam_x, cam_y = get_camera()
+    for wall in get_room_walls():
+        draw_rect = wall.copy()
+        draw_rect.x -= cam_x
+        draw_rect.y -= cam_y
+        pygame.draw.rect(screen, (70, 70, 70), draw_rect)
+#Save and Load
+def save_game():
+    data = {
+        "hp": hp,
+        "tokens": tokens,
+        "weapon": has_metal_spear,
+        "room": current_room
+    }
+    with open("save.json", "w") as f:
+        json.dump(data, f)
+
+def load_game():
+    global hp, tokens, has_metal_spear, current_room
+    try:
+        with open("save.json") as f:
+            data = json.load(f)
+        hp = data["hp"]
+        tokens = data["tokens"]
+        has_metal_spear = data["weapon"]
+        current_room = data["room"]
+    except:
+        pass
+
 # ================= ENEMIES =================
-def make_enemy(x,y,hp=3,speed=2):
+def make_enemy(x, y, hp=3, speed=2):
     return {
-        "rect": pygame.Rect(x,y,42,42),
+        "rect": pygame.Rect(x, y, 42, 42),
         "hp": hp,
         "max_hp": hp,
-        "dx": random.choice([-speed,speed]),
-        "dy": random.choice([-speed,speed])
+        "speed": speed,
+        "img": skeleton_img
+        
+        
     }
+
+
+def update_enemies():
+    for e in rooms[current_room]["enemies"]:
+        if e["hp"] <= 0:
+            continue
+
+        # Richting naar speler
+        dx = player_rect.centerx - e["rect"].centerx
+        dy = player_rect.centery - e["rect"].centery
+        dist = (dx*dx + dy*dy) ** 0.5
+        if dist == 0:
+            continue  # voorkomen van deling door nul
+
+        speed = 2  # vaste vijandensnelheid
+        e["rect"].x += dx / dist * speed
+        e["rect"].y += dy / dist * speed
+
+        # Botsing met muren
+        if e["rect"].left <= WALL_THICKNESS:
+            e["rect"].left = WALL_THICKNESS
+        if e["rect"].right >= ROOM_WIDTH - WALL_THICKNESS:
+            e["rect"].right = ROOM_WIDTH - WALL_THICKNESS
+        if e["rect"].top <= WALL_THICKNESS:
+            e["rect"].top = WALL_THICKNESS
+        if e["rect"].bottom >= ROOM_HEIGHT - WALL_THICKNESS:
+            e["rect"].bottom = ROOM_HEIGHT - WALL_THICKNESS
+
+        # Vijand kan speler schade doen
+        if player_rect.colliderect(e["rect"]):
+            handle_damage()
+
 
 
 def make_enemies(n, speed):
@@ -153,33 +255,30 @@ rooms = {
 
     "lobby": {
         "color": (41,90,96),
-        "doors": [{"rect": pygame.Rect(100, 50, 70, 100), "target": "starting_room", "spawn": (200,200)},
-                  {"rect": pygame.Rect(300, 50, 70, 100), "target": "hallway right", "spawn": (200,200)},
-                  {"rect": pygame.Rect(500, 50, 70, 100), "target": "hallway left", "spawn": (200,200)}], 
-        "enemies": make_enemies(random.randint(1,2), speed=2), 
+        "doors": [
+            {"rect": pygame.Rect(100, 50, 70, 100), "target": "starting_room", "spawn": (200,200)},
+            {"rect": pygame.Rect(300, 50, 70, 100), "target": "hallway right", "spawn": (200,200)},
+            {"rect": pygame.Rect(500, 50, 70, 100), "target": "hallway left", "spawn": (200,200)}
+        ], 
+        "enemies": make_enemies(random.randint(1,2), 2), 
     },
 
     "hallway right": {
         "color": (41,90,96),
-        "doors": [{"rect": pygame.Rect(WIDTH//2-40, 50, 70, 100), "target": "lobby", "spawn": (200,200)}
-        ], 
-        "enemies": make_enemies(random.randint(1,2), speed=2), 
+        "doors": [{"rect": pygame.Rect(WIDTH//2-40, 50, 70, 100), "target": "lobby", "spawn": (200,200)}], 
+        "enemies": make_enemies(random.randint(1,2), 2), 
     },
 
-     "hallway left": {
+    "hallway left": {
         "color": (41,90,96),
-        "doors": [{"rect": pygame.Rect(WIDTH//2-40, 50, 70, 100), "target": "lobby", "spawn": (200,200)}
-        ], 
-        "enemies": make_enemies(random.randint(1,2), speed=2), 
+        "doors": [{"rect": pygame.Rect(WIDTH//2-40, 50, 70, 100), "target": "lobby", "spawn": (200,200)}], 
+        "enemies": make_enemies(random.randint(1,2), 2), 
     },
 
-    # --- FINAL WING ---
     "crypt": {
         "color": (30, 30, 30),
-        "doors": [
-            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110), "target": "chapel", "spawn": (200,200)},
-        ],
-        "enemies": make_enemies(random.randint(4, 6), 4),
+        "doors": [{"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110), "target": "chapel", "spawn": (200,200)}],
+        "enemies": make_enemies(random.randint(4,6), 4),
     },
 
     "chapel": {
@@ -188,7 +287,7 @@ rooms = {
             {"rect": pygame.Rect(30, HEIGHT//2-55, 80, 110), "target": "crypt", "spawn": (WIDTH-140, HEIGHT//2)},
             {"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "boss_room", "spawn": (WIDTH//2, HEIGHT-140)},
         ],
-        "enemies": make_enemies(random.randint(3, 5), 4),
+        "enemies": make_enemies(random.randint(3,5), 4),
     },
 
     "boss_room": {
@@ -196,9 +295,77 @@ rooms = {
         "doors": [],
         "enemies": make_enemies(1, 1),
     },
+
+    "library": {
+        "color": (5, 40, 62),
+        "doors": [{"rect": pygame.Rect(WIDTH//2-40, HEIGHT-100, 80, 80), "target": "basement", "spawn": (WIDTH-140, HEIGHT//2)}],
+        "enemies": make_enemies(random.randint(1,3), 3),
+    },
+
+    "basement": {
+        "color": (55, 188, 31),
+        "doors": [{"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "dungeon", "spawn": (2, HEIGHT//2)}],
+        "enemies": [],
+    },
+
+    "dungeon": {
+        "color": (32, 12, 36),
+        "doors": [{"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110), "target": "storage", "spawn": (WIDTH//2, HEIGHT//2)}],
+        "enemies": make_enemies(random.randint(1,2), 10),
+    },
+
+    "storage": {
+        "color": (60, 25, 5),
+        "doors": [{"rect": pygame.Rect(30, HEIGHT//2-55, 80, 110), "target": "chapel", "spawn": (WIDTH-140, HEIGHT//2)}],
+        "enemies": make_enemies(random.randint(2,5), 5),
+    },
+
+    "cellar": {
+        "color": (55, 188, 31),
+        "doors": [{"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "orangery", "spawn": (2, HEIGHT//2)}],
+        "enemies": [],
+    },
+
+    "orangery": {
+        "color": (55, 188, 31),
+        "doors": [{"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "garden", "spawn": (2, HEIGHT//2)}],
+        "enemies": [],
+    },
+
+    "garden": {
+        "color": (55, 188, 31),
+        "doors": [{"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "gatetower", "spawn": (2, HEIGHT//2)}],
+        "enemies": [],
+    },
+
+    "grand_courtyard": {
+        "color": (55, 188, 31),
+        "doors": [{"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "bedchamber", "spawn": (2, HEIGHT//2)}],
+        "enemies": [],
+    },
+
+    "bedchamber": {
+        "color": (55, 188, 31),
+        "doors": [{"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "great_hall", "spawn": (2, HEIGHT//2)}],
+        "enemies": [],
+    },
+
+    "great_hall": {
+        "color": (55, 188, 31),
+        "doors": [{"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "corridor", "spawn": (2, HEIGHT//2)}],
+        "enemies": [],
+    },
+
+    "corridor": {
+        "color": (55, 188, 31),
+        "doors": [{"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "starting_room", "spawn": (2, HEIGHT//2)}],
+        "enemies": [],
+    }
 }
 
 current_room = "starting_room"
+
+
 
 # ================= CAMERA =================
 def camera():
@@ -208,16 +375,7 @@ def camera():
     )
 
 # ================= HUD =================
-def draw_hud():
-    for i in range(max_hp):
-        col = RED if i < hp else (90,40,40)
-        pygame.draw.circle(screen,col,(20+i*22,20),8)
 
-    info = f"Tokens: {tokens} | Weapon: {'Metal' if has_metal_spear else 'Wood'}"
-    screen.blit(ui.render(info,True,WHITE),(16,45))
-
-    if popup_msg and pygame.time.get_ticks() < popup_until:
-        screen.blit(ui.render(popup_msg,True,YELLOW),(16,75))
 
 # ================= INPUT =================
 def handle_input(keys):
@@ -310,19 +468,36 @@ def process_doors(keys):
 # ================= DRAW =================
 def draw_room():
     camx,camy = camera()
-    screen.blit(floor_bg,(0,0))
+    # screen.blit(background_bg,(0,0))
+    # screen.fill((0,0,255))
 
     # for d in rooms[current_room]["doors"]:
     #     r=d["rect"].move(-camx,-camy)
     #     pygame.draw.rect(screen,YELLOW,r,3)
+    # for d in rooms[current_room]["doors"]:
+    #     r = d["rect"].move(-camx, -camy)
+    #     screen.blit(door_img, r.topleft)
+
+    # for e in rooms[current_room]["enemies"]:
+    #     if e["hp"] > 0:
+    #         r = e["rect"].move(-camx, -camy)
+    #         screen.blit(e["img"], r.topleft)
+
+
+    def draw_room():
+        camx, camy = camera()
+        screen.fill((0, 0, 0))  # zwart scherm, geen afbeelding
+
     for d in rooms[current_room]["doors"]:
         r = d["rect"].move(-camx, -camy)
         screen.blit(door_img, r.topleft)
 
     for e in rooms[current_room]["enemies"]:
-        if e["hp"]>0:
-            r=e["rect"].move(-camx,-camy)
-            pygame.draw.rect(screen,GREEN,r)
+        if e["hp"] > 0:
+            r = e["rect"].move(-camx, -camy)
+            screen.blit(e["img"], r.topleft)
+
+
 
 def draw_player():
     camx,camy = camera()
@@ -374,12 +549,14 @@ while running:
     process_doors(keys)
     if keys[pygame.K_SPACE]: try_attack()
 
-    for e in rooms[current_room]["enemies"]:
-        if e["hp"] > 0:
-            e["rect"].x += e["dx"]
-            e["rect"].y += e["dy"]
-        if player_rect.colliderect(e["rect"]):
-            handle_damage()
+    # for e in rooms[current_room]["enemies"]:
+    #     if e["hp"] > 0:
+    #         e["rect"].x += e["dx"]
+    #         e["rect"].y += e["dy"]
+    #     if player_rect.colliderect(e["rect"]):
+    #         handle_damage()
+
+    update_enemies()
 
 
     draw_room()
