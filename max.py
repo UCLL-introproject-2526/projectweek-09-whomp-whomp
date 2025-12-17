@@ -1,7 +1,8 @@
-import pygame, sys, random
+import pygame, sys, random, math
 pygame.init()
 
 WIDTH, HEIGHT = 900, 600
+ROOM_WIDTH, ROOM_HEIGHT = 1600, 1200
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Hotel Transylvania")
 clock = pygame.time.Clock()
@@ -10,19 +11,19 @@ ui = pygame.font.SysFont(None, 32)
 title = pygame.font.SysFont(None, 56)
 
 WHITE = (255,255,255)
-RED = (230,50,50)
+RED = (220,60,60)
 GREEN = (80,220,120)
 YELLOW = (230,200,60)
 BROWN = (120,80,40)
 DARK = (20,10,22)
 
-# Player
-player = pygame.Rect(WIDTH//2-20, HEIGHT//2-28, 40, 56)
+# ---------------- PLAYER ----------------
+player_rect = pygame.Rect(WIDTH//2-20, HEIGHT//2-28, 40, 56)
 player_speed = 5
 player_dir = "down"
 max_hp = 5
 hp = max_hp
-invul_ms = 500
+invul_ms = 600
 last_hit = -9999
 
 #Animation
@@ -58,22 +59,24 @@ has_metal_spear = False
 wood_damage = 1
 metal_damage = 3
 attack_range = 42
-attack_cd_ms = 300
+attack_cd = 300
 last_attack = -9999
+
 popup_msg = None
 popup_until = 0
 
-# >>> WEAPON SYSTEM
-current_weapon = None
+shake = 0
 
-# Enemy helper
+# ---------------- ENEMIES ----------------
 def make_enemy(x, y, hp=3, speed=2):
     return {
         "rect": pygame.Rect(x, y, 42, 42),
         "hp": hp,
         "max_hp": hp,
-        "dx": random.choice([-speed, speed]),
-        "dy": random.choice([-speed, speed])
+        "speed": speed,
+        "dx": random.choice([-1,1])*speed,
+        "dy": random.choice([-1,1])*speed,
+        "hit_flash": 0
     }
 
 def make_enemies(amount, speed):
@@ -94,186 +97,202 @@ def make_weapon(x, y, wtype, speed=2):
         "picked": False
     }
 
-# Rooms
+# ---------------- ROOMS ----------------
 rooms = {
-    "lobby": {
-        "color": (32, 12, 36),
-        "doors": [
-            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110),
-             "target": "kitchen", "spawn": (120, HEIGHT//2)}
-        ],
-        "enemy": make_enemy(220, 180),
-        "weapon": make_weapon(300, 300, "dagger")
-    },
-    "kitchen": {
-        "color": (60, 25, 5),
-        "doors": [
-            {"rect": pygame.Rect(30, HEIGHT//2-55, 80, 110),
-             "target": "lobby", "spawn": (WIDTH-140, HEIGHT//2)},
-            {"rect": pygame.Rect(WIDTH-110, 60, 80, 110),
-             "target": "library", "spawn": (WIDTH//2, HEIGHT-140)}
-        ],
-        "enemy": make_enemy(520, 340, hp=4),
-        "weapon": make_weapon(420, 200, "axe")
-    },
-    "library": {
-        "color": (5, 40, 62),
-        "doors": [
-            {"rect": pygame.Rect(WIDTH//2-40, HEIGHT-100, 80, 80),
-             "target": "kitchen", "spawn": (WIDTH-140, HEIGHT//2)}
-        ],
-        "enemy": make_enemy(380, 160, hp=5),
-        "weapon": make_weapon(250, 250, "spear")
+    "starting_room": {"color":(55,188,31),"doors":[
+        {"rect":pygame.Rect(WIDTH//2-40,20,80,90),"target":"lobby","spawn":(200,HEIGHT//2)}
+    ],"enemies":[]},
+
+    "lobby":{"color":(32,12,36),"doors":[
+        {"rect":pygame.Rect(WIDTH-110,HEIGHT//2-55,80,110),"target":"hallway","spawn":(200,HEIGHT//2)}
+    ],"enemies":make_enemies(2,2)},
+
+    "hallway":{"color":(80,80,80),"doors":[
+        {"rect":pygame.Rect(WIDTH//2-40,HEIGHT-100,80,80),"target":"boss_room","spawn":(WIDTH//2,HEIGHT-150)}
+    ],"enemies":make_enemies(3,3)},
+
+    "boss_room":{"color":(120,0,0),"doors":[],
+        "enemies":[make_enemy(ROOM_WIDTH//2,ROOM_HEIGHT//2,30,1)]
     }
 }
 
-current_room = "lobby"
+current_room = "starting_room"
 
-def draw_hud():
-    for i in range(max_hp):
-        col = (220,60,60) if i < hp else (90,40,40)
-        x = 16 + i*22
-        pygame.draw.circle(screen, col, (x, 18), 8)
-        pygame.draw.circle(screen, col, (x+10, 18), 8)
-        pygame.draw.polygon(screen, col, [(x-5, 22), (x+15, 22), (x+5, 34)])
+# ---------------- CAMERA ----------------
+def get_camera():
+    global shake
+    cx = player_rect.centerx - WIDTH//2
+    cy = player_rect.centery - HEIGHT//2
+    cx = max(0, min(cx, ROOM_WIDTH-WIDTH))
+    cy = max(0, min(cy, ROOM_HEIGHT-HEIGHT))
+    if shake > 0:
+        cx += random.randint(-shake,shake)
+        cy += random.randint(-shake,shake)
+        shake -= 1
+    return cx, cy
 
-    weapon = current_weapon if current_weapon else "None"
-    info = f"Tokens: {tokens} | Weapon: {weapon}"
-    screen.blit(ui.render(info, True, WHITE), (16, 50))
-
-    if popup_msg and pygame.time.get_ticks() < popup_until:
-        screen.blit(ui.render(popup_msg, True, YELLOW), (16, 80))
-
-def draw_room(name):
-    room = rooms[name]
+# ---------------- DRAW ----------------
+def draw_room():
+    room = rooms[current_room]
+    cam_x, cam_y = get_camera()
     screen.fill(room["color"])
 
     for d in room["doors"]:
-        pygame.draw.rect(screen, YELLOW, d["rect"], border_radius=6)
-        pygame.draw.rect(screen, BROWN, d["rect"], 3, border_radius=6)
+        if not room_cleared():
+            continue
+        r = d["rect"].move(-cam_x,-cam_y)
+        pygame.draw.rect(screen,YELLOW,r,border_radius=6)
+        pygame.draw.rect(screen,BROWN,r,3,border_radius=6)
 
-    e = room["enemy"]
-    if e and e["hp"] > 0:
-        pygame.draw.rect(screen, GREEN, e["rect"], border_radius=6)
+    for e in room["enemies"]:
+        if e["hp"]<=0: continue
+        r = e["rect"].move(-cam_x,-cam_y)
+        color = RED if pygame.time.get_ticks()-e["hit_flash"]<100 else GREEN
+        pygame.draw.rect(screen,color,r,border_radius=6)
+        hp_ratio = e["hp"]/e["max_hp"]
+        pygame.draw.rect(screen,(40,40,40),(r.x,r.y-6,r.width,4))
+        pygame.draw.rect(screen,RED,(r.x,r.y-6,int(r.width*hp_ratio),4))
 
 def draw_player():
-    pygame.draw.rect(screen, RED, player, border_radius=10)
+    global player_frame
+    cam_x, cam_y = get_camera()
+    row = DIRECTION_ROW[player_dir]
+    frame = int(player_frame)%len(player_sprites[row])
+    img = player_sprites[row][frame]
+    r = player_rect.move(-cam_x,-cam_y)
+    screen.blit(img,r)
 
-def draw_weapon():
-    w = rooms[current_room]["weapon"]
-    if w and not w["picked"]:
-        pygame.draw.rect(screen, (180,180,255), w["rect"], border_radius=6)
+def draw_hud():
+    for i in range(max_hp):
+        c = RED if i<hp else (90,40,40)
+        pygame.draw.circle(screen,c,(20+i*22,20),8)
+    txt = f"Tokens: {tokens} | {'Metal' if has_metal_spear else 'Wood'} spear"
+    screen.blit(ui.render(txt,True,WHITE),(16,50))
+    if popup_msg and pygame.time.get_ticks()<popup_until:
+        screen.blit(ui.render(popup_msg,True,YELLOW),(16,80))
 
-def attack_rect():
-    r = player
-    if player_dir == "up":
-        return pygame.Rect(r.centerx-8, r.top-attack_range, 16, attack_range)
-    if player_dir == "down":
-        return pygame.Rect(r.centerx-8, r.bottom, 16, attack_range)
-    if player_dir == "left":
-        return pygame.Rect(r.left-attack_range, r.centery-8, attack_range, 16)
-    return pygame.Rect(r.right, r.centery-8, attack_range, 16)
+# ---------------- LOGIC ----------------
+def room_cleared():
+    return all(e["hp"]<=0 for e in rooms[current_room]["enemies"])
 
-def current_damage():
-    if current_weapon == "dagger": return 2
-    if current_weapon == "axe": return 4
-    if current_weapon == "spear": return 3
-    return 1
-
-def try_attack():
-    global last_attack, popup_msg, popup_until
-    now = pygame.time.get_ticks()
-    if now - last_attack < attack_cd_ms:
-        return
-    last_attack = now
-
-    e = rooms[current_room]["enemy"]
-    if e and e["hp"] > 0 and attack_rect().colliderect(e["rect"]):
-        e["hp"] -= current_damage()
-        if e["hp"] <= 0:
-            popup_msg = "Monster defeated!"
-            popup_until = now + 1200
-
-def update_enemy():
-    e = rooms[current_room]["enemy"]
-    if e and e["hp"] > 0:
-        e["rect"].x += e["dx"]
-        e["rect"].y += e["dy"]
-        if e["rect"].left < 0 or e["rect"].right > WIDTH: e["dx"] *= -1
-        if e["rect"].top < 0 or e["rect"].bottom > HEIGHT: e["dy"] *= -1
-
-def update_weapon():
-    w = rooms[current_room]["weapon"]
-    if not w or w["picked"]: return
-    w["rect"].x += w["dx"]
-    w["rect"].y += w["dy"]
-    if w["rect"].left < 0 or w["rect"].right > WIDTH: w["dx"] *= -1
-    if w["rect"].top < 0 or w["rect"].bottom > HEIGHT: w["dy"] *= -1
-
-def handle_damage(amount):
-    global hp, last_hit
-    now = pygame.time.get_ticks()
-    if now - last_hit >= invul_ms:
-        last_hit = now
-        hp -= amount
-
-def process_collisions(keys):
-    global current_weapon, popup_msg, popup_until
-
-    e = rooms[current_room]["enemy"]
-    if e and e["hp"] > 0 and player.colliderect(e["rect"]):
-        handle_damage(1)
-
-    w = rooms[current_room]["weapon"]
-    if w and not w["picked"] and player.colliderect(w["rect"]):
-        w["picked"] = True
-        current_weapon = w["type"]
-        popup_msg = f"Picked up {current_weapon}!"
-        popup_until = pygame.time.get_ticks() + 1500
-
-    for d in rooms[current_room]["doors"]:
-        if player.colliderect(d["rect"]) and keys[pygame.K_e]:
-            switch_room(d["target"], d["spawn"])
-
-def switch_room(target, spawn):
-    global current_room, current_weapon
-    w = rooms[current_room]["weapon"]
-    if w: w["picked"] = False
-    current_weapon = None
-    current_room = target
-    player.center = spawn
+def update_enemies():
+    for e in rooms[current_room]["enemies"]:
+        if e["hp"]<=0: continue
+        dx = player_rect.centerx-e["rect"].centerx
+        dy = player_rect.centery-e["rect"].centery
+        dist = max(1,math.hypot(dx,dy))
+        if dist<300:
+            e["rect"].x += int(dx/dist*e["speed"])
+            e["rect"].y += int(dy/dist*e["speed"])
+        else:
+            e["rect"].x += e["dx"]
+            e["rect"].y += e["dy"]
 
 def handle_input(keys):
-    global player_dir
+    global player_dir, player_frame
     vx = vy = 0
-    if keys[pygame.K_a]: vx = -player_speed; player_dir = "left"
-    if keys[pygame.K_d]: vx = player_speed; player_dir = "right"
-    if keys[pygame.K_w]: vy = -player_speed; player_dir = "up"
-    if keys[pygame.K_s]: vy = player_speed; player_dir = "down"
-    player.x += vx
-    player.y += vy
-    player.clamp_ip(pygame.Rect(0,0,WIDTH,HEIGHT))
+    moving = False
 
-# Main loop
-running = True
+    if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+        vx = -player_speed
+        player_dir = "left"
+        moving = True
+
+    if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+        vx = player_speed
+        player_dir = "right"
+        moving = True
+
+    if keys[pygame.K_UP] or keys[pygame.K_w]:
+        vy = -player_speed
+        player_dir = "up"
+        moving = True
+
+    if keys[pygame.K_DOWN] or keys[pygame.K_s]:
+        vy = player_speed
+        player_dir = "down"
+        moving = True
+
+    player_rect.x += vx
+    player_rect.y += vy
+    player_rect.clamp_ip(pygame.Rect(0, 0, ROOM_WIDTH, ROOM_HEIGHT))
+
+    if moving:
+        player_frame += animation_speed
+    else:
+        player_frame = 0
+
+def attack_rect():
+    r=player_rect
+    if player_dir=="up": return pygame.Rect(r.centerx-8,r.top-attack_range,16,attack_range)
+    if player_dir=="down": return pygame.Rect(r.centerx-8,r.bottom,16,attack_range)
+    if player_dir=="left": return pygame.Rect(r.left-attack_range,r.centery-8,attack_range,16)
+    return pygame.Rect(r.right,r.centery-8,attack_range,16)
+
+def try_attack():
+    global last_attack,tokens,has_metal_spear,popup_msg,popup_until
+    now=pygame.time.get_ticks()
+    if now-last_attack<attack_cd: return
+    last_attack=now
+    hb=attack_rect()
+    for e in rooms[current_room]["enemies"]:
+        if e["hp"]>0 and hb.colliderect(e["rect"]):
+            e["hp"]-=metal_damage if has_metal_spear else wood_damage
+            e["hit_flash"]=now
+            if e["hp"]<=0:
+                tokens+=1
+                popup_msg="+1 token"
+                popup_until=now+1200
+                if tokens>=10 and not has_metal_spear:
+                    has_metal_spear=True
+                    popup_msg="Metal spear unlocked!"
+                    popup_until=now+2000
+
+def handle_damage():
+    global hp,last_hit,shake
+    now=pygame.time.get_ticks()
+    if now-last_hit>invul_ms:
+        hp-=1
+        last_hit=now
+        shake=8
+
+def process_collisions(keys):
+    for e in rooms[current_room]["enemies"]:
+        if e["hp"]>0 and player_rect.colliderect(e["rect"]):
+            handle_damage()
+    if room_cleared():
+        for d in rooms[current_room]["doors"]:
+            if player_rect.colliderect(d["rect"]) and keys[pygame.K_e]:
+                switch_room(d["target"],d["spawn"])
+
+def switch_room(target,spawn):
+    global current_room
+    current_room=target
+    player_rect.center=spawn
+
+# ---------------- MAIN LOOP ----------------
+running=True
 while running:
     for ev in pygame.event.get():
-        if ev.type == pygame.QUIT:
-            running = False
+        if ev.type==pygame.QUIT:
+            running=False
 
-    keys = pygame.key.get_pressed()
+    keys=pygame.key.get_pressed()
     handle_input(keys)
-    if keys[pygame.K_SPACE]:
-        try_attack()
+    if keys[pygame.K_SPACE]: try_attack()
 
-    update_enemy()
-    update_weapon()
-
-    draw_room(current_room)
-    draw_weapon()
+    update_enemies()
+    draw_room()
     draw_player()
     draw_hud()
     process_collisions(keys)
+
+    if hp<=0:
+        screen.fill(DARK)
+        screen.blit(title.render("Game Over",True,RED),(WIDTH//2-120,HEIGHT//2-40))
+        pygame.display.flip()
+        pygame.time.wait(2000)
+        pygame.quit(); sys.exit()
 
     pygame.display.flip()
     clock.tick(60)

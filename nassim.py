@@ -34,8 +34,14 @@ last_hit = -9999
 player_frame = 0
 animation_speed= 0.2
 
+start_bg = pygame.image.load(("img\Startscherm.jpg")).convert_alpha()
+start_bg = pygame.transform.scale(start_bg, (WIDTH, HEIGHT))
+
+floor_bg = pygame.image.load(("img\stone.jpg")).convert_alpha()
+floor_bg = pygame.transform.scale(floor_bg, (WIDTH, HEIGHT))
+
 frame_width, frame_height = 64, 64
-player_spritesheet = pygame.image.load("projectweek-09-whomp-whomp\img\player.png").convert_alpha()
+player_spritesheet = pygame.image.load("img\player.png").convert_alpha()
 
 def load_spritesheet(sheet, frame_w, frame_h):
     sheet_width, sheet_height = sheet.get_size()
@@ -147,41 +153,50 @@ rooms = {
 current_room = "starting_room"
 
 # ================= NAAM =================
-def ask_player_name():
+def show_start_screen_and_ask_name():
     global player_name
     player_name = ""
-    while True:
-        screen.blit(start_bg, (0,0))
-        txt = ui.render("Voer je naam in: " + player_name, True, WHITE)
-        screen.blit(txt, (WIDTH//2 - txt.get_width()//2, HEIGHT//2 + 200))
-        pygame.display.flip()
 
+    # --- Title screen ---
+    title_running = True
+    while title_running:
         for ev in pygame.event.get():
             if ev.type == pygame.QUIT:
-                pygame.quit(); sys.exit()
+                pygame.quit()
+                sys.exit()
             if ev.type == pygame.KEYDOWN:
                 if ev.key == pygame.K_RETURN:
-                    if player_name == "":
-                        player_name = "Speler"
-                    return
+                    title_running = False  # Exit the title screen
+
+        screen.blit(start_bg, (0, 0))
+        screen.blit(title.render("Frankenstein mansion", True, WHITE), (250, 80))
+        screen.blit(ui.render("Druk ENTER om te starten", True, YELLOW), (320, 520))
+        pygame.display.flip()
+        clock.tick(60)
+
+    # --- Ask for player name ---
+    asking_name = True
+    while asking_name:
+        for ev in pygame.event.get():
+            if ev.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if ev.type == pygame.KEYDOWN:
+                if ev.key == pygame.K_RETURN:
+                    if player_name.strip() == "":
+                        player_name = "speler"
+                    asking_name = False
                 elif ev.key == pygame.K_BACKSPACE:
                     player_name = player_name[:-1]
                 elif ev.unicode.isprintable():
                     player_name += ev.unicode
 
-# ================= STARTSCHERM =================
-def show_start_screen():
-    while True:
-        screen.blit(start_bg, (0,0))
-        screen.blit(title.render("Hotel Transylvania", True, WHITE), (220, 80))
-        screen.blit(ui.render("Druk ENTER om te starten", True, YELLOW), (320, 520))
+        screen.blit(start_bg, (0, 0))
+        prompt_text = ui.render("Voer je naam in: " + player_name, True, WHITE)
+        screen.blit(prompt_text, (WIDTH//2 - prompt_text.get_width()//2, HEIGHT//2 + 200))
         pygame.display.flip()
+        clock.tick(60)
 
-        for ev in pygame.event.get():
-            if ev.type == pygame.QUIT:
-                pygame.quit(); sys.exit()
-            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN:
-                return
 
 # --- Camera ---
 def get_camera():
@@ -407,18 +422,18 @@ def handle_input(keys):
 
 
 # Main loop
-ask_player_name
-show_start_screen()
+
+
+show_start_screen_and_ask_name()
 
 running = True
 while running:
     for ev in pygame.event.get():
         if ev.type == pygame.QUIT:
             running = False
-
-if ev.type == pygame.KEYDOWN:
-    if ev.key == pygame.K_F3:
-        DEBUG = not DEBUG
+        elif ev.type == pygame.KEYDOWN:
+            if ev.key == pygame.K_F3:
+                DEBUG = not DEBUG
 
 
     keys = pygame.key.get_pressed()
@@ -437,7 +452,7 @@ if ev.type == pygame.KEYDOWN:
     if hp <= 0:
         # Game over scherm
         screen.fill(DARK)
-        over1 = title.render("Trash", True, (255,200,200))
+        over1 = title.render("You suck a googus", True, (255,200,200))
         over2 = ui.render("Enter: opnieuw beginnen | Esc: afsluiten", True, WHITE)
         screen.blit(over1, over1.get_rect(center=(WIDTH//2, HEIGHT//2 - 20)))
         screen.blit(over2, over2.get_rect(center=(WIDTH//2, HEIGHT//2 + 24)))
