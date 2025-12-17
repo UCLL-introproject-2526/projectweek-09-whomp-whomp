@@ -189,6 +189,17 @@ def handle_damage():
         last_hit=now
         hp-=1
 
+# ================= DEUREN =================
+def switch_room(target, spawn):
+    global current_room
+    current_room = target
+    player_rect.center = spawn
+
+def process_doors(keys):
+    for d in rooms[current_room]["doors"]:
+        if player_rect.colliderect(d["rect"]) and keys[pygame.K_e]:
+            switch_room(d["target"], d["spawn"])
+
 # ================= DRAW =================
 def draw_room():
     camx,camy = camera()
@@ -213,7 +224,7 @@ def ask_name():
     name=""
     while True:
         screen.blit(start_bg,(0,0))
-        screen.blit(ui.render("Naam: "+name,True,WHITE),(300,900))
+        screen.blit(ui.render("Vul hier je naam in: "+name,True,WHITE),(300,550))
         pygame.display.flip()
         for e in pygame.event.get():
             if e.type==pygame.KEYDOWN:
@@ -244,6 +255,7 @@ while running:
 
     keys = pygame.key.get_pressed()
     handle_input(keys)
+    process_doors(keys)
     if keys[pygame.K_SPACE]: try_attack()
 
     for e in rooms[current_room]["enemies"]:
