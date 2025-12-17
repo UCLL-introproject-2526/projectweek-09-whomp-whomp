@@ -9,7 +9,7 @@ IMG_DIR = os.path.join(BASE_DIR, "img")
 WIDTH, HEIGHT = 900, 600
 ROOM_WIDTH, ROOM_HEIGHT = 1600, 1200
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Hotel Transylvania")
+pygame.display.set_caption("Frankenstein manor")
 clock = pygame.time.Clock()
 WALL_THICKNESS = 30
 
@@ -19,6 +19,10 @@ start_bg = pygame.transform.scale(start_bg, (WIDTH, HEIGHT))
 
 floor_bg = pygame.image.load(os.path.join(IMG_DIR, "stone floor.jpg")).convert()
 floor_bg = pygame.transform.scale(floor_bg, (WIDTH, HEIGHT))
+
+door_img = pygame.image.load(os.path.join(IMG_DIR, "door3.jpg")).convert_alpha()
+door_img = pygame.transform.scale(door_img, (80, 110))
+
 
 player_sheet = pygame.image.load("projectweek-09-whomp-whomp\img\player.png").convert_alpha()
 
@@ -46,17 +50,36 @@ hp = max_hp
 invul_ms = 500
 last_hit = -9999
 
-# ================= SPRITES =================
-def load_sprites(sheet, fw, fh):
+#Animation
+player_frame = 0
+animation_speed= 0.2
+
+frame_width, frame_height = 64, 64
+player_spritesheet = pygame.image.load("projectweek-09-whomp-whomp\img\player.png").convert_alpha()
+
+def load_spritesheet(sheet, frame_w, frame_h):
+    sheet_width, sheet_height = sheet.get_size()
     frames = []
-    for y in range(0, sheet.get_height(), fh):
+    for y in range(0, sheet_height, frame_h):
         row = []
-        for x in range(0, sheet.get_width(), fw):
-            row.append(sheet.subsurface(pygame.Rect(x,y,fw,fh)))
+        for x in range(0, sheet_width, frame_w):
+            row.append(sheet.subsurface(pygame.Rect(x, y, frame_w, frame_h)))
         frames.append(row)
     return frames
 
-player_sprites = load_sprites(player_sheet, 64, 64)
+player_sprites = load_spritesheet(player_spritesheet, frame_width, frame_height)
+
+# ================= SPRITES =================
+# def load_sprites(sheet, fw, fh):
+#     frames = []
+#     for y in range(0, sheet.get_height(), fh):
+#         row = []
+#         for x in range(0, sheet.get_width(), fw):
+#             row.append(sheet.subsurface(pygame.Rect(x,y,fw,fh)))
+#         frames.append(row)
+#     return frames
+
+# player_sprites = load_sprites(player_sheet, 64, 64)
 DIR_ROW = {"down":0,"left":1,"right":2,"up":3}
 
 # ================= COMBAT =================
@@ -111,36 +134,13 @@ def make_enemy(x,y,hp=3,speed=2):
         "dy": random.choice([-speed,speed])
     }
 
+
 def make_enemies(n, speed):
     return [make_enemy(random.randint(50,ROOM_WIDTH-90),
                        random.randint(50,ROOM_HEIGHT-90),
                        3, speed) for _ in range(n)]
 
 
-# ================= ROOMS =================
-# rooms = {
-#     "starting_room":{
-#         "doors":[{"rect":pygame.Rect(760,20,80,90),"target":"lobby","spawn":(200,HEIGHT//2)}],
-#         "enemies":[]
-#     },
-#     "lobby":{
-#         "doors":[{"rect":pygame.Rect(WIDTH-110,HEIGHT//2-55,80,110),
-#                   "target":"kitchen","spawn":(200,HEIGHT//2)}],
-#         "enemies":make_enemies(random.randint(1,2),3)
-#     },
-#     "kitchen":{
-#         "doors":[
-#             {"rect":pygame.Rect(30,HEIGHT//2-55,80,110),"target":"lobby","spawn":(WIDTH-200,HEIGHT//2)},
-#             {"rect":pygame.Rect(WIDTH-110,60,80,110),"target":"library","spawn":(WIDTH//2,HEIGHT-160)}
-#         ],
-#         "enemies":make_enemies(random.randint(2,5),2)
-#     },
-#     "library":{
-#         "doors":[{"rect":pygame.Rect(WIDTH//2-40,HEIGHT-100,80,80),
-#                   "target":"kitchen","spawn":(WIDTH-200,HEIGHT//2)}],
-#         "enemies":make_enemies(random.randint(1,3),1)
-#     }
-# }
 
 rooms = {
     "starting_room": {
@@ -312,9 +312,12 @@ def draw_room():
     camx,camy = camera()
     screen.blit(floor_bg,(0,0))
 
+    # for d in rooms[current_room]["doors"]:
+    #     r=d["rect"].move(-camx,-camy)
+    #     pygame.draw.rect(screen,YELLOW,r,3)
     for d in rooms[current_room]["doors"]:
-        r=d["rect"].move(-camx,-camy)
-        pygame.draw.rect(screen,YELLOW,r,3)
+        r = d["rect"].move(-camx, -camy)
+        screen.blit(door_img, r.topleft)
 
     for e in rooms[current_room]["enemies"]:
         if e["hp"]>0:

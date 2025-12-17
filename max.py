@@ -25,6 +25,33 @@ hp = max_hp
 invul_ms = 500
 last_hit = -9999
 
+#Animation
+player_frame = 0
+animation_speed= 0.2
+
+frame_width, frame_height = 64, 64
+player_spritesheet = pygame.image.load("projectweek-09-whomp-whomp\img\player.png").convert_alpha()
+
+def load_spritesheet(sheet, frame_w, frame_h):
+    sheet_width, sheet_height = sheet.get_size()
+    frames = []
+    for y in range(0, sheet_height, frame_h):
+        row = []
+        for x in range(0, sheet_width, frame_w):
+            row.append(sheet.subsurface(pygame.Rect(x, y, frame_w, frame_h)))
+        frames.append(row)
+    return frames
+
+player_sprites = load_spritesheet(player_spritesheet, frame_width, frame_height)
+
+# Map directions to sheet rows
+DIRECTION_ROW = {
+    "down": 0,
+    "left": 1,
+    "right": 2,
+    "up": 3
+}
+
 # Combat / progression
 tokens = 0
 has_metal_spear = False
@@ -48,6 +75,14 @@ def make_enemy(x, y, hp=3, speed=2):
         "dx": random.choice([-speed, speed]),
         "dy": random.choice([-speed, speed])
     }
+
+def make_enemies(amount, speed):
+    enemies = []
+    for _ in range(amount):
+        x = random.randint(50, WIDTH - 90)
+        y = random.randint(50, HEIGHT - 90)
+        enemies.append(make_enemy(x, y, hp=3, speed=speed))
+    return enemies
 
 # >>> WEAPON HELPER
 def make_weapon(x, y, wtype, speed=2):
