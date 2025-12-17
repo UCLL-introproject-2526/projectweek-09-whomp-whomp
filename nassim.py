@@ -385,7 +385,7 @@ while running:
     if hp <= 0:
         # Game over scherm
         screen.fill(DARK)
-        over1 = title.render("Trash", True, (255,200,200))
+        over1 = title.render("You suck a googus", True, (255,200,200))
         over2 = ui.render("Enter: opnieuw beginnen | Esc: afsluiten", True, WHITE)
         screen.blit(over1, over1.get_rect(center=(WIDTH//2, HEIGHT//2 - 20)))
         screen.blit(over2, over2.get_rect(center=(WIDTH//2, HEIGHT//2 + 24)))
