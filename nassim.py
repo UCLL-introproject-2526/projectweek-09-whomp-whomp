@@ -1,11 +1,13 @@
 import pygame, sys, random
 pygame.init()
 
+DEBUG = True
+
 WIDTH, HEIGHT = 900, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Hotel Transylvania")
 clock = pygame.time.Clock()
-WALL_THICKNESS = 60
+WALL_THICKNESS = 30
 
 ROOM_WIDTH, ROOM_HEIGHT = 5000, 3000
 
@@ -90,7 +92,7 @@ rooms = {
     "starting_room": {
         "color": (55, 188, 31),
         "doors": [
-            {"rect": pygame.Rect(1000, 100, 80, 90), "target": "lobby", "spawn": (2500, 1500)},
+            {"rect": pygame.Rect(1000, 50, 80, 90), "target": "lobby", "spawn": (2500, 1500)},
         ],
         "enemies": [],
     },
@@ -143,6 +145,43 @@ rooms = {
 }
 
 current_room = "starting_room"
+
+# ================= NAAM =================
+def ask_player_name():
+    global player_name
+    player_name = ""
+    while True:
+        screen.blit(start_bg, (0,0))
+        txt = ui.render("Voer je naam in: " + player_name, True, WHITE)
+        screen.blit(txt, (WIDTH//2 - txt.get_width()//2, HEIGHT//2 + 200))
+        pygame.display.flip()
+
+        for ev in pygame.event.get():
+            if ev.type == pygame.QUIT:
+                pygame.quit(); sys.exit()
+            if ev.type == pygame.KEYDOWN:
+                if ev.key == pygame.K_RETURN:
+                    if player_name == "":
+                        player_name = "Speler"
+                    return
+                elif ev.key == pygame.K_BACKSPACE:
+                    player_name = player_name[:-1]
+                elif ev.unicode.isprintable():
+                    player_name += ev.unicode
+
+# ================= STARTSCHERM =================
+def show_start_screen():
+    while True:
+        screen.blit(start_bg, (0,0))
+        screen.blit(title.render("Hotel Transylvania", True, WHITE), (220, 80))
+        screen.blit(ui.render("Druk ENTER om te starten", True, YELLOW), (320, 520))
+        pygame.display.flip()
+
+        for ev in pygame.event.get():
+            if ev.type == pygame.QUIT:
+                pygame.quit(); sys.exit()
+            if ev.type == pygame.KEYDOWN and ev.key == pygame.K_RETURN:
+                return
 
 # --- Camera ---
 def get_camera():
@@ -368,11 +407,20 @@ def handle_input(keys):
 
 
 # Main loop
+
+ask_player_name()
+show_start_screen()
+
 running = True
 while running:
     for ev in pygame.event.get():
         if ev.type == pygame.QUIT:
             running = False
+
+if ev.type == pygame.KEYDOWN:
+    if ev.key == pygame.K_F3:
+        DEBUG = not DEBUG
+
 
     keys = pygame.key.get_pressed()
     handle_input(keys)
@@ -383,7 +431,8 @@ while running:
     draw_room()
     draw_player()
     draw_hud()
-    draw_debug_hud()
+    if DEBUG:
+       draw_debug_hud()
     process_collisions(keys)
 
     if hp <= 0:
@@ -425,4 +474,4 @@ while running:
     clock.tick(60)
 
 pygame.quit()
-sys.exit()
+
