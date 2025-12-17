@@ -18,5 +18,5 @@ Nassim ontwikkeld eindscherm met uitslagen als iemand dood is.
 dag3:
 Thibo gaat vandaag mergen van alle filles in main.py
 Nassim zorgd dat alle foto's samen in 1mapje zitten in github.
-Tang maakt nog meer kamers aan.
-Lander Poster maken.
+Tang maakt nog meer kamers aan. en stuurd die door naar Thibo.
+Lander Poster maken. en doorsturen.
