@@ -35,7 +35,7 @@ player_frame = 0
 animation_speed= 0.2
 
 frame_width, frame_height = 64, 64
-player_spritesheet = pygame.image.load("img\player.png").convert_alpha()
+player_spritesheet = pygame.image.load("projectweek-09-whomp-whomp\img\player.png").convert_alpha()
 
 def load_spritesheet(sheet, frame_w, frame_h):
     sheet_width, sheet_height = sheet.get_size()
@@ -407,8 +407,7 @@ def handle_input(keys):
 
 
 # Main loop
-
-ask_player_name()
+ask_player_name
 show_start_screen()
 
 running = True

@@ -11,6 +11,7 @@ ROOM_WIDTH, ROOM_HEIGHT = 1600, 1200
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Hotel Transylvania")
 clock = pygame.time.Clock()
+WALL_THICKNESS = 30
 
 # ================= AFBEELDINGEN =================
 start_bg = pygame.image.load(os.path.join(IMG_DIR, "Startscherm.jpg")).convert()
@@ -19,7 +20,7 @@ start_bg = pygame.transform.scale(start_bg, (WIDTH, HEIGHT))
 floor_bg = pygame.image.load(os.path.join(IMG_DIR, "stone floor.jpg")).convert()
 floor_bg = pygame.transform.scale(floor_bg, (WIDTH, HEIGHT))
 
-player_sheet = pygame.image.load("projectweek-09-whomp-whomp\player.png").convert_alpha()
+player_sheet = pygame.image.load("projectweek-09-whomp-whomp\img\player.png").convert_alpha()
 
 # ================= FONTS =================
 ui = pygame.font.SysFont(None, 32)
@@ -69,6 +70,37 @@ last_attack = -9999
 popup_msg = None
 popup_until = 0
 
+def get_camera():
+    cam_x = player_rect.centerx - WIDTH // 2
+    cam_y = player_rect.centery - HEIGHT // 2
+    # Clamp camera to room bounds
+    cam_x = max(0, min(cam_x, ROOM_WIDTH - WIDTH))
+    cam_y = max(0, min(cam_y, ROOM_HEIGHT - HEIGHT))
+    return cam_x, cam_y
+
+def draw_walls():
+    cam_x, cam_y = get_camera()
+    for wall in get_room_walls():
+        draw_rect = wall.copy()
+        draw_rect.x -= cam_x
+        draw_rect.y -= cam_y
+        pygame.draw.rect(screen, (70, 70, 70), draw_rect)
+
+def get_room_walls():
+    return [
+        # Top wall
+        pygame.Rect(0, 0, ROOM_WIDTH, WALL_THICKNESS),
+
+        # Bottom wall
+        pygame.Rect(0, ROOM_HEIGHT - WALL_THICKNESS, ROOM_WIDTH, WALL_THICKNESS),
+
+        # Left wall
+        pygame.Rect(0, 0, WALL_THICKNESS, ROOM_HEIGHT),
+
+        # Right wall
+        pygame.Rect(ROOM_WIDTH - WALL_THICKNESS, 0, WALL_THICKNESS, ROOM_HEIGHT),
+    ]
+
 # ================= ENEMIES =================
 def make_enemy(x,y,hp=3,speed=2):
     return {
@@ -79,34 +111,91 @@ def make_enemy(x,y,hp=3,speed=2):
         "dy": random.choice([-speed,speed])
     }
 
-def make_enemies(n,s):
+def make_enemies(n, speed):
     return [make_enemy(random.randint(50,ROOM_WIDTH-90),
                        random.randint(50,ROOM_HEIGHT-90),
-                       3,s) for _ in range(n)]
+                       3, speed) for _ in range(n)]
+
 
 # ================= ROOMS =================
+# rooms = {
+#     "starting_room":{
+#         "doors":[{"rect":pygame.Rect(760,20,80,90),"target":"lobby","spawn":(200,HEIGHT//2)}],
+#         "enemies":[]
+#     },
+#     "lobby":{
+#         "doors":[{"rect":pygame.Rect(WIDTH-110,HEIGHT//2-55,80,110),
+#                   "target":"kitchen","spawn":(200,HEIGHT//2)}],
+#         "enemies":make_enemies(random.randint(1,2),3)
+#     },
+#     "kitchen":{
+#         "doors":[
+#             {"rect":pygame.Rect(30,HEIGHT//2-55,80,110),"target":"lobby","spawn":(WIDTH-200,HEIGHT//2)},
+#             {"rect":pygame.Rect(WIDTH-110,60,80,110),"target":"library","spawn":(WIDTH//2,HEIGHT-160)}
+#         ],
+#         "enemies":make_enemies(random.randint(2,5),2)
+#     },
+#     "library":{
+#         "doors":[{"rect":pygame.Rect(WIDTH//2-40,HEIGHT-100,80,80),
+#                   "target":"kitchen","spawn":(WIDTH-200,HEIGHT//2)}],
+#         "enemies":make_enemies(random.randint(1,3),1)
+#     }
+# }
+
 rooms = {
-    "starting_room":{
-        "doors":[{"rect":pygame.Rect(760,20,80,90),"target":"lobby","spawn":(200,HEIGHT//2)}],
-        "enemies":[]
-    },
-    "lobby":{
-        "doors":[{"rect":pygame.Rect(WIDTH-110,HEIGHT//2-55,80,110),
-                  "target":"kitchen","spawn":(200,HEIGHT//2)}],
-        "enemies":make_enemies(random.randint(1,2),3)
-    },
-    "kitchen":{
-        "doors":[
-            {"rect":pygame.Rect(30,HEIGHT//2-55,80,110),"target":"lobby","spawn":(WIDTH-200,HEIGHT//2)},
-            {"rect":pygame.Rect(WIDTH-110,60,80,110),"target":"library","spawn":(WIDTH//2,HEIGHT-160)}
+    "starting_room": {
+        "color": (55, 188, 31),
+        "doors": [
+            {"rect": pygame.Rect(1000, 50, 80, 90), "target": "lobby", "spawn": (2500, 1500)},
         ],
-        "enemies":make_enemies(random.randint(2,5),2)
+        "enemies": [],
     },
-    "library":{
-        "doors":[{"rect":pygame.Rect(WIDTH//2-40,HEIGHT-100,80,80),
-                  "target":"kitchen","spawn":(WIDTH-200,HEIGHT//2)}],
-        "enemies":make_enemies(random.randint(1,3),1)
-    }
+
+    "lobby": {
+        "color": (41,90,96),
+        "doors": [{"rect": pygame.Rect(100, 50, 70, 100), "target": "starting_room", "spawn": (200,200)},
+                  {"rect": pygame.Rect(300, 50, 70, 100), "target": "hallway right", "spawn": (200,200)},
+                  {"rect": pygame.Rect(500, 50, 70, 100), "target": "hallway left", "spawn": (200,200)}], 
+        "enemies": make_enemies(random.randint(1,2), speed=2), 
+    },
+
+    "hallway right": {
+        "color": (41,90,96),
+        "doors": [{"rect": pygame.Rect(WIDTH//2-40, 50, 70, 100), "target": "lobby", "spawn": (200,200)}
+        ], 
+        "enemies": make_enemies(random.randint(1,2), speed=2), 
+    },
+
+     "hallway left": {
+        "color": (41,90,96),
+        "doors": [{"rect": pygame.Rect(WIDTH//2-40, 50, 70, 100), "target": "lobby", "spawn": (200,200)}
+        ], 
+        "enemies": make_enemies(random.randint(1,2), speed=2), 
+    },
+
+    # --- FINAL WING ---
+    "crypt": {
+        "color": (30, 30, 30),
+        "doors": [
+            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110), "target": "chapel", "spawn": (200,200)},
+        ],
+        "enemies": make_enemies(random.randint(4, 6), 4),
+    },
+
+    "chapel": {
+        "color": (200, 200, 160),
+        "doors": [
+            {"rect": pygame.Rect(30, HEIGHT//2-55, 80, 110), "target": "crypt", "spawn": (WIDTH-140, HEIGHT//2)},
+            {"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "boss_room", "spawn": (WIDTH//2, HEIGHT-140)},
+        ],
+        "enemies": make_enemies(random.randint(3, 5), 4),
+    },
+
+    "boss_room": {
+        "color": (120, 0, 0),
+        "doors": [],
+        "enemies": make_enemies(1, 1),
+    },
 }
 
 current_room = "starting_room"
