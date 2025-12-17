@@ -183,11 +183,29 @@ def try_attack():
 
 # ================= DAMAGE =================
 def handle_damage():
-    global hp,last_hit
+    global hp, last_hit
     now = pygame.time.get_ticks()
-    if now-last_hit>=invul_ms:
-        last_hit=now
-        hp-=1
+    if now - last_hit >= invul_ms:
+        last_hit = now
+        hp -= 1
+    if hp <= 0:
+        game_over(player_name)
+
+def game_over(name):
+    while True:
+        screen.fill((0,0,0))
+        screen.blit(title.render(f"Jammer {name}, je bent verloren.", True, RED),(120,250))
+        screen.blit(ui.render("Druk ENTER om af te sluiten", True, WHITE),(280,320))
+        pygame.display.flip()
+
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if e.type == pygame.KEYDOWN and e.key == pygame.K_RETURN:
+                pygame.quit()
+                sys.exit()
+
 
 # ================= DEUREN =================
 def switch_room(target, spawn):
@@ -221,16 +239,20 @@ def draw_player():
 
 # ================= STARTSCREENS =================
 def ask_name():
-    name=""
+    name = ""
     while True:
-        screen.blit(start_bg,(0,0))
-        screen.blit(ui.render("Vul hier je naam in: "+name,True,WHITE),(300,550))
+        screen.blit(start_bg, (0,0))
+        screen.blit(ui.render("Vul hier je naam in: " + name, True, WHITE), (300,550))
         pygame.display.flip()
         for e in pygame.event.get():
-            if e.type==pygame.KEYDOWN:
-                if e.key==pygame.K_RETURN: return
-                elif e.key==pygame.K_BACKSPACE: name=name[:-1]
-                elif e.unicode.isprintable(): name+=e.unicode
+            if e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_RETURN:
+                    return name  # <-- teruggeven van de ingevoerde naam
+                elif e.key == pygame.K_BACKSPACE:
+                    name = name[:-1]
+                elif e.unicode.isprintable():
+                    name += e.unicode
+
 
 def start_screen():
     while True:
@@ -244,8 +266,10 @@ def start_screen():
         for e in pygame.event.get():
             if e.type==pygame.KEYDOWN and e.key==pygame.K_RETURN: return
 
+# ================= START ================
+player_name = ask_name()
+
 # ================= MAIN =================
-ask_name()
 start_screen()
 
 running=True
@@ -259,10 +283,12 @@ while running:
     if keys[pygame.K_SPACE]: try_attack()
 
     for e in rooms[current_room]["enemies"]:
-        if e["hp"]>0:
-            e["rect"].x+=e["dx"]
-            e["rect"].y+=e["dy"]
-            if player_rect.colliderect(e["rect"]): handle_damage()
+        if e["hp"] > 0:
+            e["rect"].x += e["dx"]
+            e["rect"].y += e["dy"]
+        if player_rect.colliderect(e["rect"]):
+            handle_damage()
+
 
     draw_room()
     draw_player()
