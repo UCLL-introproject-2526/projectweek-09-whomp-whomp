@@ -213,7 +213,7 @@ def ask_name():
     name=""
     while True:
         screen.blit(start_bg,(0,0))
-        screen.blit(ui.render("Naam: "+name,True,WHITE),(300,400))
+        screen.blit(ui.render("Naam: "+name,True,WHITE),(300,900))
         pygame.display.flip()
         for e in pygame.event.get():
             if e.type==pygame.KEYDOWN:
@@ -226,6 +226,9 @@ def start_screen():
         screen.blit(start_bg,(0,0))
         screen.blit(title.render("Hotel Transylvania",True,WHITE),(220,80))
         screen.blit(ui.render("ENTER om te starten",True,YELLOW),(330,520))
+        screen.blit(ui.render("- Gebruik de toetsen zqsd of maak gebruik van de pijltjes.",True,YELLOW),(150,150))
+        screen.blit(ui.render("- Gebruik linkermuisklik om de monsters aan te vallen", True,YELLOW),(150,220))
+        screen.blit(ui.render("- Probeer al de monsters te verslaan, om zo het speel uit te spelen.", True, YELLOW),(150,290))
         pygame.display.flip()
         for e in pygame.event.get():
             if e.type==pygame.KEYDOWN and e.key==pygame.K_RETURN: return
