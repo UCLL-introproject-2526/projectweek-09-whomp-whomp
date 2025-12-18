@@ -7,6 +7,25 @@ DEBUG = True
 shop_cd_ms = 300
 last_shop_action = 0
 
+is_attacking = False
+attack_anim_time = 150  # ms
+attack_anim_start = 0
+attack_frame = 0.0
+attack_anim_speed = 0.35
+
+ATTACK_HIT_FRAME = 2
+attack_hit_done = False
+
+
+dodge_cd = 10000      # cooldown ms
+dodge_time = 2000    # hoe lang dodge duurt
+last_dodge = -9999
+is_dodging = False
+
+blink_interval = 80  # ms tussen aan/uit
+
+
+
 
 WIDTH, HEIGHT = 900, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -39,6 +58,16 @@ def load_skeleton_frames(sheet, frame_w, frame_h):
                 )
     return frames
 
+def remove_blank_frames(frames, min_alpha=1):
+    cleaned = []
+    for f in frames:
+        # bounding rect van niet-transparante pixels
+        r = f.get_bounding_rect(min_alpha=min_alpha)
+        if r.width > 0 and r.height > 0:
+            cleaned.append(f)
+    return cleaned
+
+
 
 
 # Playerplayer_rect = pyg
@@ -53,11 +82,15 @@ invul_ms = 500
 last_hit = -9999
 
 #Animation
-player_frame = 0
-animation_speed= 0.2
+player_frame = 0.0
+animation_speed= 0.001
 
 door_img = pygame.image.load("projectweek-09-whomp-whomp\img\door3.jpg").convert_alpha()
 door_img = pygame.transform.scale(door_img, (80, 100))  # pas grootte aan
+
+bedroom_bg = pygame.image.load("projectweek-09-whomp-whomp/img/bedroom.png").convert_alpha()
+bedroom_bg = pygame.transform.scale(bedroom_bg, (ROOM_WIDTH, ROOM_HEIGHT))  # full-room background
+
 
 
 start_bg = pygame.image.load(("projectweek-09-whomp-whomp\img\Startscherm.jpg")).convert_alpha()
@@ -67,12 +100,34 @@ floor_bg = pygame.image.load(("projectweek-09-whomp-whomp\img\stone.jpg")).conve
 floor_bg = pygame.transform.scale(floor_bg, (WIDTH, HEIGHT))
 
 frame_width, frame_height = 64, 64
-player_spritesheet = pygame.image.load("projectweek-09-whomp-whomp\img\player.png").convert_alpha()
+player_spritesheet = pygame.image.load("projectweek-09-whomp-whomp\img\character-spritesheet (2).png").convert_alpha()
 
 skeleton_spritesheet = pygame.image.load("projectweek-09-whomp-whomp\\img\\skeleton.png").convert_alpha()
 frame_width, frame_height = 64, 64  # pas aan naar de juiste grootte van één frame
 skeleton_img = skeleton_spritesheet.subsurface(pygame.Rect(0, 0, frame_width, frame_height))
 skeleton_frames = load_skeleton_frames(skeleton_spritesheet, frame_width, frame_height)
+
+skeleton_spritesheet = pygame.image.load("projectweek-09-whomp-whomp/img/skeleton.png").convert_alpha()
+werewolf_sheet = pygame.image.load("projectweek-09-whomp-whomp/img/werewolf.png").convert_alpha()
+zombie_sheet = pygame.image.load("projectweek-09-whomp-whomp/img/zombie2.png").convert_alpha()
+
+FRAME_W, FRAME_H = 64, 64
+WEREWOLF_FRAME_W, WEREWOLF_FRAME_H = 64, 64
+ZOMBIE_FRAME_W, ZOMBIE_FRAME_H = 64, 64
+
+skeleton_frames = remove_blank_frames(
+    load_skeleton_frames(skeleton_spritesheet, FRAME_W, FRAME_H)
+)
+
+werewolf_frames = remove_blank_frames(
+    load_skeleton_frames(werewolf_sheet, WEREWOLF_FRAME_W, WEREWOLF_FRAME_H)
+)
+
+zombie_frames = remove_blank_frames(
+    load_skeleton_frames(zombie_sheet, ZOMBIE_FRAME_W, ZOMBIE_FRAME_H)
+)
+
+
 
 buy_sound = pygame.mixer.Sound("projectweek-09-whomp-whomp/sounds/buy_1.wav")
 buy_sound.set_volume(0.6)
@@ -80,8 +135,38 @@ buy_sound.set_volume(0.6)
 error_sound = pygame.mixer.Sound("projectweek-09-whomp-whomp/sounds/buy_1.wav")  # tijdelijk zelfde sound
 error_sound.set_volume(0.4)
 
+dodge_sound = pygame.mixer.Sound(
+    "projectweek-09-whomp-whomp\sounds\swoosh-sound-effects.wav"
+)
+dodge_sound.set_volume(0.7)
 
 
+enemy_death_sound = pygame.mixer.Sound(
+    "projectweek-09-whomp-whomp\sounds\enemy-duck-death-mp3.wav"
+)
+enemy_death_sound.set_volume(0.6)
+
+footstep_sound = pygame.mixer.Sound(
+    "projectweek-09-whomp-whomp\sounds\loud-footstep.wav"
+)
+footstep_sound.set_volume(0.4)
+
+footstep_channel = pygame.mixer.Channel(1)
+
+spear_attack_sound = pygame.mixer.Sound(
+    "projectweek-09-whomp-whomp\sounds\spear_thrust-1-382402 (mp3cut.net).wav"
+)
+spear_attack_sound.set_volume(0.5)
+
+
+
+
+
+
+def dodge_cooldown_ratio():
+    now = pygame.time.get_ticks()
+    elapsed = now - last_dodge
+    return min(1.0, max(0.0, elapsed / dodge_cd))
 
     
 
@@ -91,9 +176,12 @@ def load_spritesheet(sheet, frame_w, frame_h):
     for y in range(0, sheet_height, frame_h):
         row = []
         for x in range(0, sheet_width, frame_w):
-            row.append(sheet.subsurface(pygame.Rect(x, y, frame_w, frame_h)))
+            row.append(
+                sheet.subsurface(pygame.Rect(x, y, frame_w, frame_h)).copy()
+            )
         frames.append(row)
     return frames
+
 
 player_sprites = load_spritesheet(player_spritesheet, frame_width, frame_height)
 
@@ -104,6 +192,14 @@ DIRECTION_ROW = {
     "right": 2,
     "up": 3
 }
+
+ATTACK_DIRECTION_ROW = {
+    "down": 4,
+    "left": 5,
+    "right": 6,
+    "up": 7
+}
+
 
 
 # Combat / progression
@@ -118,27 +214,65 @@ popup_msg = None
 popup_until = 0
 damage_bonus = 0
 
-def make_enemy(x, y, hp=3, speed=2):
+def make_enemy(x, y, enemy_type="skeleton"):
+    if enemy_type == "skeleton":
+        frames = skeleton_frames
+        hp = 3
+        speed = 2
+        damage = 1
+
+    elif enemy_type == "zombie":
+        frames = zombie_frames
+        hp = 5
+        speed = 1
+        damage = 1
+
+    elif enemy_type == "werewolf":
+        frames = werewolf_frames
+        hp = 4
+        speed = 3
+        damage = 2
+
+    rect = pygame.Rect(x, y, 42, 42)
+
     return {
-        "rect": pygame.Rect(x, y, 42, 42),
-        "hp": hp,
-        "max_hp": hp,
-        "dx": random.choice([-speed, speed]),
-        "dy": random.choice([-speed, speed]),
-        "frame": 0,
-        "frame_timer": 0,
-        "dead": False
-    }
+    "type": enemy_type,
+    "rect": rect,
+    "pos": pygame.Vector2(rect.center),   # <-- toevoegen (float center)
+    "hp": hp,
+    "max_hp": hp,
+    "speed": speed,
+    "frames": frames,
+    "frame": 0,
+    "frame_timer": pygame.time.get_ticks(),
+    "dead": False,
+    "attack_cd": 800,
+    "last_attack": 0,
+    "damage": damage,
+    "aggro_range": int((ROOM_WIDTH**2 + ROOM_HEIGHT**2) ** 0.5)  # <-- groter (kamer-diagonaal)
+}
 
 
 
-def make_enemies(amount, speed):
+
+
+def make_enemies(amount):
     enemies = []
+
     for _ in range(amount):
         x = random.randint(WALL_THICKNESS, ROOM_WIDTH - WALL_THICKNESS - 50)
         y = random.randint(WALL_THICKNESS, ROOM_HEIGHT - WALL_THICKNESS - 50)
-        enemies.append(make_enemy(x, y, hp=3, speed=speed))
+
+        enemy_type = random.choice([
+            "skeleton",
+            "zombie",
+            "werewolf"
+        ])
+
+        enemies.append(make_enemy(x, y, enemy_type))
+
     return enemies
+
 
 def random_door_rect(side, width=70, height=100):
     margin = WALL_THICKNESS + 20
@@ -234,8 +368,12 @@ for i, room_name in enumerate(HAUNTED_ROOMS):
             random.randint(40, 180)
         ),
         "doors": [],
-        "enemies": make_enemies(random.randint(2, 5), speed=2)
+        "enemies": make_enemies(random.randint(2, 5))
+
     }
+    if room_name == "abandoned_bedroom":
+        rooms[room_name]["bg"] = bedroom_bg
+
 
     # deur terug naar vorige room
     if i == 0:
@@ -259,7 +397,7 @@ for i, room_name in enumerate(HAUNTED_ROOMS):
             "spawn": spawn_from_door(next_door)
         })
 
-current_room = "starting_room"
+current_room = "abandoned_bedroom"
 
 # ======================
 # SHOP ROOM
@@ -432,7 +570,7 @@ def draw_hud():
     # hearts
     for i in range(max_hp):
         col = (220,60,60) if i < hp else (90,40,40)
-        x = 16 + i*22
+        x = 16 + i*32
         pygame.draw.circle(screen, col, (x, 18), 8)
         pygame.draw.circle(screen, col, (x+10, 18), 8)
         pygame.draw.polygon(screen, col, [(x-5, 22), (x+15, 22), (x+5, 34)])
@@ -445,6 +583,37 @@ def draw_hud():
         surf = ui.render(popup_msg, True, YELLOW)
         screen.blit(surf, (16, 80))
 
+
+def draw_level_indicator():
+    total_levels = len(HAUNTED_ROOMS)
+
+    if current_room == "starting_room":
+        level = 0
+    elif current_room in HAUNTED_ROOMS:
+        level = HAUNTED_ROOMS.index(current_room) + 1
+    else:
+        return  # shop_room → niets tonen
+
+    text = f"Level {level} / {total_levels}"
+    surf = ui.render(text, True, WHITE)
+
+    padding = 10
+    x = WIDTH - surf.get_width() - 20
+    y = HEIGHT - surf.get_height() - 20
+
+    bg = pygame.Rect(
+        x - padding,
+        y - padding,
+        surf.get_width() + padding * 2,
+        surf.get_height() + padding * 2
+    )
+
+    pygame.draw.rect(screen, (0, 0, 0), bg)
+    pygame.draw.rect(screen, YELLOW, bg, 2)
+
+    screen.blit(surf, (x, y))
+
+
 def draw_minimap():
     map_w, map_h = 220, 140
     padding = 12
@@ -456,7 +625,6 @@ def draw_minimap():
     pygame.draw.rect(screen, (15, 15, 25), (x0, y0, map_w, map_h))
     pygame.draw.rect(screen, YELLOW, (x0, y0, map_w, map_h), 2)
 
-    # layout
     rooms_per_row = 5
     cell_size = 26
     gap = 6
@@ -470,14 +638,32 @@ def draw_minimap():
         cx = x0 + 12 + col * (cell_size + gap)
         cy = y0 + 12 + row * (cell_size + gap)
 
-        # kleur
+        # kleur huidige kamer
         if room == current_room:
-            color = GREEN
+            border_color = GREEN
+            text_color = GREEN
         else:
-            color = (100, 100, 120)
+            border_color = (120, 120, 140)
+            text_color = WHITE
 
-        pygame.draw.rect(screen, color, (cx, cy, cell_size, cell_size))
+        # kader
+        pygame.draw.rect(
+            screen,
+            border_color,
+            (cx, cy, cell_size, cell_size),
+            2
+        )
 
+        # nummer (1-based)
+        number = str(i + 1)
+        txt = ui.render(number, True, text_color)
+        screen.blit(
+            txt,
+            (
+                cx + cell_size // 2 - txt.get_width() // 2,
+                cy + cell_size // 2 - txt.get_height() // 2
+            )
+        )
 
 def draw_room_name():
     room_text = ui.render(f"Room: {current_room}", True, WHITE)
@@ -503,15 +689,55 @@ def draw_room_name():
 
 
 
-def draw_player():
-    global player_frame
-    cam_x, cam_y = get_camera()
-    frame_index = int(player_frame) % len(player_sprites[DIRECTION_ROW[player_dir]])
-    img = player_sprites[DIRECTION_ROW[player_dir]][frame_index]
-    draw_rect = player_rect.copy()
-    draw_rect.x -= cam_x
-    draw_rect.y -= cam_y
-    screen.blit(img, draw_rect)
+
+def handle_input(keys):
+    global player_dir, player_frame
+
+    vx = vy = 0
+    moving = False
+
+    if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+        vx = -player_speed
+        player_dir = "left"
+        moving = True
+
+    if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+        vx = player_speed
+        player_dir = "right"
+        moving = True
+
+    if keys[pygame.K_UP] or keys[pygame.K_w]:
+        vy = -player_speed
+        player_dir = "up"
+        moving = True
+
+    if keys[pygame.K_DOWN] or keys[pygame.K_s]:
+        vy = player_speed
+        player_dir = "down"
+        moving = True
+
+    move_player(vx, vy)
+
+    # Animation logic - properly wraps frame counter
+    if not is_attacking:
+        if moving:
+            player_frame += animation_speed
+            # Wrap around when we reach the end of the animation
+            max_frames = len(player_sprites[DIRECTION_ROW[player_dir]])
+            if player_frame >= max_frames:
+                player_frame = 0.0
+        else:
+            player_frame = 0.0  # Reset to idle frame when not moving
+
+        # 🔊 voetstappen
+    if moving and not is_dodging:
+        if not footstep_channel.get_busy():
+            footstep_channel.play(footstep_sound, loops=-1)
+    else:
+        footstep_channel.stop()
+
+
+
 
 def move_player(vx, vy):
     # Move X axis
@@ -532,6 +758,15 @@ def move_player(vx, vy):
             elif vy < 0:
                 player_rect.top = wall.bottom
 
+def enemy_attack(e):
+    global hp
+    now = pygame.time.get_ticks()
+
+    if now - e["last_attack"] >= e["attack_cd"]:
+        handle_damage(e["damage"])
+        e["last_attack"] = now
+
+
 
 
 
@@ -551,66 +786,130 @@ def current_damage():
 
 
 def try_attack():
-    global last_attack, tokens, has_metal_spear, popup_msg, popup_until
+    global last_attack, is_attacking, attack_anim_start
+    global attack_frame, attack_hit_done
 
     now = pygame.time.get_ticks()
     if now - last_attack < attack_cd_ms:
         return
-    last_attack = now
 
+    last_attack = now
+    is_attacking = True
+    attack_anim_start = now
+    attack_frame = 0.0
+    attack_hit_done = False
+
+    spear_attack_sound.play()  # 🔊 ATTACK SOUND
+
+
+def apply_attack_damage():
+    global tokens, popup_msg, popup_until, attack_hit_done
+
+    if attack_hit_done:
+        return
+
+    if int(attack_frame) != ATTACK_HIT_FRAME:
+        return
+
+    attack_hit_done = True
     hb = attack_rect()
 
     for e in rooms[current_room]["enemies"]:
         if e["hp"] > 0 and hb.colliderect(e["rect"]):
+            # 💥 DAMAGE
             e["hp"] -= current_damage()
 
-            # 👇 check of enemy NU sterft
+            # ☠️ DEATH
             if e["hp"] <= 0 and not e["dead"]:
                 e["dead"] = True
+                enemy_death_sound.play()
                 tokens += 1
-                popup_msg = "+1 token (monster defeated)"
-                popup_until = now + 1500
+                popup_msg = "+1 token"
+                popup_until = pygame.time.get_ticks() + 1200
 
-                if not has_metal_spear and tokens >= 10:
-                    has_metal_spear = True
-                    popup_msg = "Metal spear unlocked!"
-                    popup_until = now + 2000
 
-    # attack flash
-    cam_x, cam_y = get_camera()
-    draw_rect = hb.copy()
-    draw_rect.x -= cam_x
-    draw_rect.y -= cam_y
-    pygame.draw.rect(screen, (255, 220, 120), draw_rect)
-    pygame.display.flip()
 
+
+
+
+
+# def update_enemies():
+#     now = pygame.time.get_ticks()
+
+#     for e in rooms[current_room]["enemies"]:
+#         if e["hp"] <= 0:
+#             continue
+
+#         # bewegen
+#         e["rect"].x += e["dx"]
+#         e["rect"].y += e["dy"]
+
+#         if e["rect"].left < WALL_THICKNESS or e["rect"].right > ROOM_WIDTH - WALL_THICKNESS:
+#             e["dx"] *= -1
+#         if e["rect"].top < WALL_THICKNESS or e["rect"].bottom > ROOM_HEIGHT - WALL_THICKNESS:
+#             e["dy"] *= -1
+
+#         # animatie (identiek aan player-logica)
+#         if now - e["frame_timer"] > 150:
+#             e["frame_timer"] = now
+#             if "frame_float" not in e:
+#                 e["frame_float"] = 0.0
+#                 e["last_frame"] = 0
+
+#                 e["frame_float"] += 1
+#                 e["last_frame"] = int(e["frame_float"])
+
+
+#             if e["last_frame"] >= len(skeleton_frames):
+#                 e["frame_float"] = 0.0
+#                 e["last_frame"] = 0
 
 def update_enemies():
-    now = pygame.time.get_ticks()
+    player_pos = pygame.Vector2(player_rect.center)
+    bounds = pygame.Rect(
+        WALL_THICKNESS, WALL_THICKNESS,
+        ROOM_WIDTH - 2 * WALL_THICKNESS,
+        ROOM_HEIGHT - 2 * WALL_THICKNESS
+    )
+
     for e in rooms[current_room]["enemies"]:
-        if e["hp"] > 0:
-            # bewegen
-            e["rect"].x += e["dx"]
-            e["rect"].y += e["dy"]
+        if e["hp"] <= 0:
+            continue
 
-            if e["rect"].left < WALL_THICKNESS or e["rect"].right > ROOM_WIDTH - WALL_THICKNESS:
-                e["dx"] *= -1
-            if e["rect"].top < WALL_THICKNESS or e["rect"].bottom > ROOM_HEIGHT - WALL_THICKNESS:
-                e["dy"] *= -1
+        to_player = player_pos - e["pos"]
+        dist = to_player.length()
 
-            # animatie update
-            if now - e["frame_timer"] > 150:  # 150 ms per frame
-                e["frame_timer"] = now
-                e["frame"] = (e["frame"] + 1) % len(skeleton_frames)
+        if dist < e["aggro_range"] and dist > 0:
+            to_player.scale_to_length(e["speed"])   # blijft float
+            e["pos"] += to_player
+            e["rect"].center = (round(e["pos"].x), round(e["pos"].y))
 
+        # binnen de kamer houden
+        e["rect"].clamp_ip(bounds)
+        e["pos"] = pygame.Vector2(e["rect"].center)
+
+
+
+
+
+# def handle_damage(amount=1):
+#     global hp, last_hit
+#     now = pygame.time.get_ticks()
+#     if now - last_hit >= invul_ms:
+#         last_hit = now
+#         hp -= amount
 
 
 def handle_damage(amount=1):
     global hp, last_hit
+    if is_dodging:
+        return  # ❌ geen damage tijdens dodge
+
     now = pygame.time.get_ticks()
     if now - last_hit >= invul_ms:
         last_hit = now
         hp -= amount
+
 
 def room_cleared(room_name):
     for e in rooms[room_name]["enemies"]:
@@ -620,29 +919,25 @@ def room_cleared(room_name):
 
 
 def process_collisions(keys):
-    # Enemy collision (damage player)
+    # Enemy damage
     for e in rooms[current_room]["enemies"]:
         if e["hp"] > 0 and player_rect.colliderect(e["rect"]):
-            handle_damage(1)
+            enemy_attack(e)
 
-    # Door interaction
+    # Door collision → meteen doorgaan
     for d in rooms[current_room]["doors"]:
         if player_rect.colliderect(d["rect"]):
 
-            # 🚪 Check of room leeg is
+            # ❌ deur geblokkeerd als enemies leven
             if not room_cleared(current_room) and current_room != "starting_room":
                 draw_center_message("Kill all enemies first!")
-
-
-                # deur is geblokkeerd
                 return
 
-            # ✅ Room cleared → deur mag open
-            hint = ui.render("E: enter " + d["target"], True, WHITE)
-            screen.blit(hint, (16, HEIGHT - 36))
+            # ✅ DIRECT door de deur
+            switch_room(d["target"], d["spawn"])
+            return
 
-            if keys[pygame.K_e]:
-                switch_room(d["target"], d["spawn"])
+
 
 
 def switch_room(target, spawn=None):
@@ -655,47 +950,115 @@ def switch_room(target, spawn=None):
 
 
 
-def handle_input(keys):
-    global player_dir, player_frame
+# def handle_input(keys):
+#     global player_dir, player_frame
 
-    vx = vy = 0
-    moving = False
+#     vx = vy = 0
+#     moving = False
 
-    if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-        vx = -player_speed
-        player_dir = "left"
+#     if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+#         vx = -player_speed
+#         player_dir = "left"
+#         moving = True
 
-    if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-        vx = player_speed
-        player_dir = "right"
+#     if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+#         vx = player_speed
+#         player_dir = "right"
+#         moving = True
 
-    if keys[pygame.K_UP] or keys[pygame.K_w]:
-        vy = -player_speed
-        player_dir = "up"
+#     if keys[pygame.K_UP] or keys[pygame.K_w]:
+#         vy = -player_speed
+#         player_dir = "up"
+#         moving = True
 
-    if keys[pygame.K_DOWN] or keys[pygame.K_s]:
-        vy = player_speed
-        player_dir = "down"
+#     if keys[pygame.K_DOWN] or keys[pygame.K_s]:
+#         vy = player_speed
+#         player_dir = "down"
+#         moving = True
 
-    # check of we bewegen
-    if vx != 0 or vy != 0:
-        moving = True
+#     move_player(vx, vy)
 
-    move_player(vx, vy)
+#     # Animation logic
+#     if not is_attacking:
+#         if moving:
+#             player_frame += animation_speed
+#             # Walk animations only use first 7 frames
+#             if player_frame >= 7:
+#                 player_frame = 0.0
+#         else:
+#             player_frame = 0.0  # Idle on first frame
 
-    # animatie
-    if moving:
-        player_frame += animation_speed
-    else:
-        player_frame = 0
+def enemies_remaining():
+    return sum(1 for e in rooms[current_room]["enemies"] if e["hp"] > 0)
+
+def draw_top_right_info():
+    lines = [
+        "M : Menu",
+        f"Enemies: {enemies_remaining()}",
+        "Dodge"
+    ]
+
+    padding = 10
+    line_height = 24
+    bar_width = 140
+    bar_height = 10
+
+    max_width = max(ui.size(line)[0] for line in lines)
+    box_width = max(max_width, bar_width) + padding * 2
+    box_height = padding * 2 + line_height * len(lines) + bar_height + 6
+
+    x = WIDTH - box_width - 12
+    y = 12
+
+    # achtergrond
+    bg = pygame.Rect(x, y, box_width, box_height)
+    pygame.draw.rect(screen, (0, 0, 0), bg)
+    pygame.draw.rect(screen, YELLOW, bg, 2)
+
+    # tekst
+    ty = y + padding
+    for line in lines:
+        txt = ui.render(line, True, WHITE)
+        screen.blit(txt, (x + padding, ty))
+        ty += line_height
+
+    # 🟦 cooldown bar
+    ratio = dodge_cooldown_ratio()
+
+    bar_x = x + padding
+    bar_y = ty + 2
+
+    # achtergrond bar
+    pygame.draw.rect(
+        screen,
+        (80, 80, 80),
+        (bar_x, bar_y, bar_width, bar_height)
+    )
+
+    # vulling
+    pygame.draw.rect(
+        screen,
+        GREEN if ratio >= 1 else YELLOW,
+        (bar_x, bar_y, bar_width * ratio, bar_height)
+    )
+
+
+
+
 
 def draw_room():
     room = rooms[current_room]
     cam_x, cam_y = get_camera()
 
     # Floor en walls
-    draw_floor()
+    # Background (per room)
+    if "bg" in room:
+        screen.blit(room["bg"], (-cam_x, -cam_y))   # camera-offset zodat het meescrollt
+    else:
+        draw_floor()
+
     draw_walls()
+
 
     # Doors
     for d in room["doors"]:
@@ -712,24 +1075,47 @@ def draw_room():
         tag = ui.render(d["target"], True, WHITE)
         screen.blit(tag, (draw_rect.centerx - tag.get_width()//2, draw_rect.top - 24))
 
+    
+    # Enemies
+        # Enemies
+    # Enemies
     # Enemies
     for e in room["enemies"]:
-        if e["hp"] > 0:
-            draw_rect = e["rect"].copy()
-            draw_rect.x -= cam_x
-            draw_rect.y -= cam_y
-            # animatie frame
-            img = skeleton_frames[e["frame"]]
-            screen.blit(img, draw_rect)
+        if e["hp"] <= 0:
+            continue
 
-            # health bar
-            hp_ratio = e["hp"] / e["max_hp"]
-            bar_w = draw_rect.width
-            bar_h = 5
-            bar_x = draw_rect.x
-            bar_y = draw_rect.y - 8
-            pygame.draw.rect(screen, (120, 0, 0), (bar_x, bar_y, bar_w, bar_h))
-            pygame.draw.rect(screen, (0, 200, 0), (bar_x, bar_y, bar_w * hp_ratio, bar_h))
+        draw_rect = e["rect"].copy()
+        draw_rect.x -= cam_x
+        draw_rect.y -= cam_y
+
+        frames = e["frames"]
+
+    # update animatie (los van tekenen)
+        now = pygame.time.get_ticks()
+        if now - e["frame_timer"] >= 120:
+            e["frame_timer"] = now
+            e["frame"] = (e["frame"] + 1) % len(frames)
+
+    # 🔥 ALTIJD tekenen
+        img = frames[e["frame"]]
+        screen.blit(img, draw_rect)
+
+    # health bar
+        hp_ratio = e["hp"] / e["max_hp"]
+        bar_w = draw_rect.width
+        bar_h = 5
+        bar_x = draw_rect.x
+        bar_y = draw_rect.y - 8
+
+        pygame.draw.rect(screen, (120, 0, 0), (bar_x, bar_y, bar_w, bar_h))
+        pygame.draw.rect(
+        screen, (0, 200, 0),
+        (bar_x, bar_y, bar_w * hp_ratio, bar_h)
+    )
+
+
+            
+
 
 def draw_center_message(text, color=RED):
     surf = ui.render(text, True, color)
@@ -824,36 +1210,57 @@ def draw_debug_hud():
         f"Room size: {ROOM_WIDTH} x {ROOM_HEIGHT}",
     ]
 
-    y = HEIGHT - 20 * len(lines) - 10
+    padding = 8
+    line_height = 20
+
+    # bereken breedte & hoogte van het kadertje
+    max_width = max(ui.size(line)[0] for line in lines)
+    box_width = max_width + padding * 2
+    box_height = len(lines) * line_height + padding * 2
+
+    x = 10
+    y = HEIGHT - box_height - 10
+
+    # 🔲 achtergrond
+    bg_rect = pygame.Rect(x, y, box_width, box_height)
+    pygame.draw.rect(screen, (0, 0, 0), bg_rect)
+    pygame.draw.rect(screen, YELLOW, bg_rect, 2)
+
+    # ✏ tekst
+    ty = y + padding
     for line in lines:
-        text = ui.render(line, True, (255, 255, 0))
-        screen.blit(text, (10, y))
-        y += 20
+        text = ui.render(line, True, YELLOW)
+        screen.blit(text, (x + padding, ty))
+        ty += line_height
 
-    # Enemies
-    for e in room["enemies"]:
-        if e["hp"] > 0:
-            draw_rect = e["rect"].copy()
-            draw_rect.x -= cam_x
-            draw_rect.y -= cam_y
-            img = skeleton_frames[e["frame"]]
-            screen.blit(img, draw_rect)
+def draw_player():
+    global player_frame, attack_frame
 
-            # health bar
-            hp_ratio = e["hp"] / e["max_hp"]
-            bar_w = draw_rect.width
-            bar_h = 5
-            bar_x = draw_rect.x
-            bar_y = draw_rect.y - 8
-            pygame.draw.rect(screen, (120, 0, 0), (bar_x, bar_y, bar_w, bar_h))
-            pygame.draw.rect(screen, (0, 200, 0), (bar_x, bar_y, bar_w * hp_ratio, bar_h))
+    # ✨ knipperen tijdens dodge
+    if is_dodging:
+        now = pygame.time.get_ticks()
+        if (now // blink_interval) % 2 == 0:
+            return  # sla tekenen over → onzichtbaar deze frame
 
-# Voeg de afbeelding toe aan alle deuren in alle kamers
-for room_name in rooms:
-    for d in rooms[room_name]["doors"]:
-        d["img"] = door_img
 
-shop_action = None
+    cam_x, cam_y = get_camera()
+
+    if is_attacking:
+        row = player_sprites[ATTACK_DIRECTION_ROW[player_dir]]
+        frame_index = int(attack_frame)
+        if frame_index >= len(row):
+            frame_index = len(row) - 1
+        img = row[frame_index]
+        attack_frame = min(attack_frame + attack_anim_speed, len(row) - 1)
+    else:
+        row = player_sprites[DIRECTION_ROW[player_dir]]
+        frame_index = int(player_frame) % len(row)
+        img = row[frame_index]
+
+    draw_rect = player_rect.copy()
+    draw_rect.x -= cam_x
+    draw_rect.y -= cam_y
+    screen.blit(img, draw_rect)
 
 
 # Main loop
@@ -899,28 +1306,52 @@ while running:
                     rooms[name]["enemies"] = []
                 else:
                     rooms[name]["enemies"] = make_enemies(
-                        random.randint(2, 5), speed=2
-                    )
+                    random.randint(2, 5)
+)
 
             menu_open = False
+
 
     else:
         handle_input(keys)
 
+        now = pygame.time.get_ticks()
+        if keys[pygame.K_LSHIFT] and not is_dodging and now - last_dodge > dodge_cd:
+            is_dodging = True
+            last_dodge = now
+            dodge_sound.play()   # 🔊 swoosh
+
+
+
+
+
         if keys[pygame.K_SPACE]:
             try_attack()
+
+        if is_attacking:
+            apply_attack_damage()
+
+            if pygame.time.get_ticks() - attack_anim_start > attack_anim_time:
+                is_attacking = False
+                attack_frame = 0.0
+
+
+
 
         update_enemies()
         draw_room()
         draw_player()
         draw_hud()
-        draw_room_name()
-        draw_minimap()
+        # draw_minimap()
+        draw_top_right_info()
+        draw_level_indicator()
 
         if current_room == "shop_room":
             handle_shop(keys)
 
 
+        if is_dodging and pygame.time.get_ticks() - last_dodge > dodge_time:
+            is_dodging = False
 
 
         if DEBUG:
