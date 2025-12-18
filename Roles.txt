@@ -24,7 +24,7 @@ Lander Poster maken. en doorsturen.
 dag4: 
 herschrijven code groep,
 mergen Thibo
-fouten zoeken Maximilien
+fouten zoeken Maximilien, einde implementeren
 aanmaken nieuw spriten Nassim
 code bestuderen Tang en Lander
 dag 5:
