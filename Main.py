@@ -1,7 +1,38 @@
 import pygame, sys, random
 pygame.init()
+pygame.mixer.init()
 
 DEBUG = True
+
+shop_cd_ms = 300
+last_shop_action = 0
+
+runs_played = 0
+best_tokens = 0
+
+def reset_run():
+    global hp, tokens, damage_bonus, has_metal_spear
+    global current_room, keys_owned, last_hit
+
+    hp = max_hp
+    tokens = 0
+    damage_bonus = 0
+    has_metal_spear = False
+    keys_owned.clear()
+    last_hit = -9999
+
+    current_room = "starting_room"
+    player_rect.center = (ROOM_WIDTH // 2, ROOM_HEIGHT // 2)
+
+    # enemies opnieuw spawnen
+    for name in rooms:
+        if name == "starting_room" or name == "shop_room":
+            rooms[name]["enemies"] = []
+        else:
+            rooms[name]["enemies"] = make_enemies(
+                random.randint(2, 5), speed=2
+            )
+
 
 WIDTH, HEIGHT = 900, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -42,7 +73,7 @@ player_rect = pygame.Rect(0, 0, 40, 56)
 player_rect.center = (ROOM_WIDTH // 2, ROOM_HEIGHT // 2)
 player_speed = 5
 player_dir = "down"
-max_hp = 5
+max_hp = 10
 hp = max_hp
 invul_ms = 500
 last_hit = -9999
@@ -68,6 +99,14 @@ skeleton_spritesheet = pygame.image.load("projectweek-09-whomp-whomp\\img\\skele
 frame_width, frame_height = 64, 64  # pas aan naar de juiste grootte van één frame
 skeleton_img = skeleton_spritesheet.subsurface(pygame.Rect(0, 0, frame_width, frame_height))
 skeleton_frames = load_skeleton_frames(skeleton_spritesheet, frame_width, frame_height)
+
+buy_sound = pygame.mixer.Sound("projectweek-09-whomp-whomp/sounds/buy_1.wav")
+buy_sound.set_volume(0.6)
+
+error_sound = pygame.mixer.Sound("projectweek-09-whomp-whomp/sounds/buy_1.wav")  # tijdelijk zelfde sound
+error_sound.set_volume(0.4)
+
+
 
 
     
@@ -98,11 +137,12 @@ tokens = 0
 has_metal_spear = False
 wood_damage = 1
 metal_damage = 3
-attack_range = 42
+attack_range = 100000
 attack_cd_ms = 300
 last_attack = -9999
 popup_msg = None
 popup_until = 0
+damage_bonus = 0
 
 def make_enemy(x, y, hp=3, speed=2):
     return {
@@ -112,8 +152,10 @@ def make_enemy(x, y, hp=3, speed=2):
         "dx": random.choice([-speed, speed]),
         "dy": random.choice([-speed, speed]),
         "frame": 0,
-        "frame_timer": 0
+        "frame_timer": 0,
+        "dead": False
     }
+
 
 
 def make_enemies(amount, speed):
@@ -157,11 +199,6 @@ def spawn_from_door(door_rect, offset=120):
     return (ROOM_WIDTH // 2, ROOM_HEIGHT // 2)
 
 
-# Rooms
-# Rooms
-# ======================
-# ROOMS (basis)
-# ======================
 HAUNTED_ROOMS = [
     "dusty_attic",
     "bloody_kitchen",
@@ -205,6 +242,16 @@ rooms["starting_room"] = {
     "enemies": []
 }
 
+# --- extra deur naar de shop ---
+shop_door = random_door_rect("bottom")
+
+rooms["starting_room"]["doors"].append({
+    "rect": shop_door,
+    "target": "shop_room",
+    "spawn": spawn_from_door(shop_door)
+})
+
+
 for i, room_name in enumerate(HAUNTED_ROOMS):
     rooms[room_name] = {
         "color": (
@@ -238,91 +285,28 @@ for i, room_name in enumerate(HAUNTED_ROOMS):
             "spawn": spawn_from_door(next_door)
         })
 
-
-
-# rooms = {
-#     "starting_room": {
-#         "color": (55, 188, 31),
-#         "doors": [
-#             {
-#                 "rect": door_to_lobby,
-#                 "target": "lobby",
-#                 "spawn": spawn_from_door(door_to_lobby)
-#             }
-#         ],
-#         "enemies": []
-#     },
-
-#     "lobby": {   # <-- wordt zo overschreven
-#         "color": (41, 90, 96),
-#         "doors": [],
-#         "enemies": []
-#     },
-
-#     "hallway right": {
-#         "color": (41, 90, 96),
-#         "doors": [],
-#         "enemies": make_enemies(5, speed=2)
-#     },
-
-#     "hallway left": {
-#         "color": (41, 90, 96),
-#         "doors": [],
-#         "enemies": make_enemies(5, speed=2)
-#     },
-
-#     "crypt": {
-#         "color": (30, 30, 30),
-#         "doors": [],
-#         "enemies": make_enemies(5, speed=2)
-#     },
-
-#     "chapel": {
-#         "color": (200, 200, 160),
-#         "doors": [],
-#         "enemies": make_enemies(5, speed=2)
-#     },
-
-#     "boss_room": {
-#         "color": (120, 0, 0),
-#         "doors": [],
-#         "enemies": make_enemies(1, 1)
-#     }
-# }
-
-
 current_room = "starting_room"
 
-# # ======================
-# # RANDOM LOBBY (FIX)
-# # ======================
+# ======================
+# SHOP ROOM
+# ======================
 
-# lobby_to_start = random_door_rect("top")
-# lobby_to_right = random_door_rect("left")
-# lobby_to_left  = random_door_rect("right")
+rooms["shop_room"] = {
+    "color": (60, 40, 80),
+    "doors": [],
+    "enemies": []
+}
+# --- deur terug naar starting_room ---
+back_door = random_door_rect("top")
 
-# rooms["lobby"]["doors"] = [
-#     {
-#         "rect": lobby_to_start,
-#         "target": "starting_room",
-#         "spawn": spawn_from_door(lobby_to_start)
-#     },
-#     {
-#         "rect": lobby_to_right,
-#         "target": "hallway right",
-#         "spawn": spawn_from_door(lobby_to_right)
-#     },
-#     {
-#         "rect": lobby_to_left,
-#         "target": "hallway left",
-#         "spawn": spawn_from_door(lobby_to_left)
-#     }
-# ]
-
-# rooms["lobby"]["enemies"] = make_enemies(5, speed=2)
+rooms["shop_room"]["doors"].append({
+    "rect": back_door,
+    "target": "starting_room",
+    "spawn": spawn_from_door(back_door)
+})
 
 
-# ================= NAAM =================
+
 def show_start_screen_and_ask_name():
     global player_name
     player_name = ""
@@ -410,13 +394,17 @@ def draw_menu():
 
     info_lines = []
 
-    # 🔴 GAME OVER TEKST
+    # GAME OVER TEKST
     if hp <= 0:
-        info_lines.append(f"Jammer {player_name},")
-        info_lines.append("je bent doodgegaan.")
-        info_lines.append("")
-        info_lines.append("Druk R om opnieuw te beginnen")
-        info_lines.append("of ESC om te stoppen")
+        if hp <= 0:
+            info_lines.append("💀 GAME OVER 💀")
+            info_lines.append("")
+            info_lines.append(f"Runs played: {runs_played}")
+            info_lines.append(f"Best tokens: {best_tokens}")
+            info_lines.append("")
+            info_lines.append("R - New Run")
+            info_lines.append("ESC - Quit")
+
 
     else:
         info_lines.extend([
@@ -487,6 +475,59 @@ def draw_hud():
         surf = ui.render(popup_msg, True, YELLOW)
         screen.blit(surf, (16, 80))
 
+def draw_minimap():
+    map_w, map_h = 220, 140
+    padding = 12
+
+    x0 = WIDTH - map_w - padding
+    y0 = HEIGHT - map_h - padding
+
+    # achtergrond
+    pygame.draw.rect(screen, (15, 15, 25), (x0, y0, map_w, map_h))
+    pygame.draw.rect(screen, YELLOW, (x0, y0, map_w, map_h), 2)
+
+    # layout
+    rooms_per_row = 5
+    cell_size = 26
+    gap = 6
+
+    all_rooms = ["starting_room"] + HAUNTED_ROOMS
+
+    for i, room in enumerate(all_rooms):
+        row = i // rooms_per_row
+        col = i % rooms_per_row
+
+        cx = x0 + 12 + col * (cell_size + gap)
+        cy = y0 + 12 + row * (cell_size + gap)
+
+        # kleur
+        if room == current_room:
+            color = GREEN
+        else:
+            color = (100, 100, 120)
+
+        pygame.draw.rect(screen, color, (cx, cy, cell_size, cell_size))
+
+
+def draw_room_name():
+    room_text = ui.render(f"Room: {current_room}", True, WHITE)
+    padding = 12
+
+    x = WIDTH - room_text.get_width() - padding
+    y = padding
+
+    # optionele achtergrond (netter leesbaar)
+    bg_rect = pygame.Rect(
+        x - 8,
+        y - 6,
+        room_text.get_width() + 16,
+        room_text.get_height() + 12
+    )
+    pygame.draw.rect(screen, (0, 0, 0), bg_rect)
+    pygame.draw.rect(screen, YELLOW, bg_rect, 2)
+
+    screen.blit(room_text, (x, y))
+
 
 
 
@@ -535,33 +576,47 @@ def attack_rect():
     return pygame.Rect(r.right, r.centery-8, attack_range, 16)
 
 def current_damage():
-    return metal_damage if has_metal_spear else wood_damage
+    base = metal_damage if has_metal_spear else wood_damage
+    return base + damage_bonus
+
 
 def try_attack():
     global last_attack, tokens, has_metal_spear, popup_msg, popup_until
+
     now = pygame.time.get_ticks()
     if now - last_attack < attack_cd_ms:
         return
     last_attack = now
+
     hb = attack_rect()
+
     for e in rooms[current_room]["enemies"]:
         if e["hp"] > 0 and hb.colliderect(e["rect"]):
-           e["hp"] -= current_damage()
-        if e["hp"] <= 0:
-            tokens += 1
-            popup_msg = "+1 token (monster defeated)"
-            popup_until = now + 1500
-            if not has_metal_spear and tokens >= 10:
-                has_metal_spear = True
-                popup_msg = "Metal spear unlocked!"
-                popup_until = now + 2000
-        # attack flash
+            e["hp"] -= current_damage()
+
+            # 👇 check of enemy NU sterft
+            if e["hp"] <= 0 and not e["dead"]:
+                e["dead"] = True
+                tokens += 1
+                global best_tokens
+                best_tokens = max(best_tokens, tokens)
+
+                popup_msg = "+1 token (monster defeated)"
+                popup_until = now + 1500
+
+                if not has_metal_spear and tokens >= 10:
+                    has_metal_spear = True
+                    popup_msg = "Metal spear unlocked!"
+                    popup_until = now + 2000
+
+    # attack flash
     cam_x, cam_y = get_camera()
     draw_rect = hb.copy()
     draw_rect.x -= cam_x
     draw_rect.y -= cam_y
-    pygame.draw.rect(screen, (255,220,120), draw_rect)
+    pygame.draw.rect(screen, (255, 220, 120), draw_rect)
     pygame.display.flip()
+
 
 def update_enemies():
     now = pygame.time.get_ticks()
@@ -590,16 +645,38 @@ def handle_damage(amount=1):
         last_hit = now
         hp -= amount
 
+def room_cleared(room_name):
+    for e in rooms[room_name]["enemies"]:
+        if e["hp"] > 0:
+            return False
+    return True
+
+
 def process_collisions(keys):
+    # Enemy collision (damage player)
     for e in rooms[current_room]["enemies"]:
-     if e["hp"] > 0 and player_rect.colliderect(e["rect"]):
-        handle_damage(1)
+        if e["hp"] > 0 and player_rect.colliderect(e["rect"]):
+            handle_damage(1)
+
+    # Door interaction
     for d in rooms[current_room]["doors"]:
         if player_rect.colliderect(d["rect"]):
+
+            # 🚪 Check of room leeg is
+            if not room_cleared(current_room) and current_room != "starting_room":
+                draw_center_message("Kill all enemies first!")
+
+
+                # deur is geblokkeerd
+                return
+
+            # ✅ Room cleared → deur mag open
             hint = ui.render("E: enter " + d["target"], True, WHITE)
-            screen.blit(hint, (16, HEIGHT-36))
+            screen.blit(hint, (16, HEIGHT - 36))
+
             if keys[pygame.K_e]:
                 switch_room(d["target"], d["spawn"])
+
 
 def switch_room(target, spawn=None):
     global current_room
@@ -687,6 +764,87 @@ def draw_room():
             pygame.draw.rect(screen, (120, 0, 0), (bar_x, bar_y, bar_w, bar_h))
             pygame.draw.rect(screen, (0, 200, 0), (bar_x, bar_y, bar_w * hp_ratio, bar_h))
 
+def draw_center_message(text, color=RED):
+    surf = ui.render(text, True, color)
+
+    x = WIDTH // 2 - surf.get_width() // 2
+    y = HEIGHT // 2 - surf.get_height() // 2
+
+    bg = pygame.Rect(
+        x - 20,
+        y - 12,
+        surf.get_width() + 40,
+        surf.get_height() + 24
+    )
+
+    pygame.draw.rect(screen, (0, 0, 0), bg)
+    pygame.draw.rect(screen, color, bg, 2)
+
+    screen.blit(surf, (x, y))
+
+def handle_shop(keys):
+    global tokens, hp, max_hp, damage_bonus, popup_msg, popup_until, last_shop_action
+
+    lines = [
+        "=== SHOP ===",
+        "E : Heal +1 HP (3 tokens)",
+        "R : Damage +1 (5 tokens)",
+        "T : Max HP +1 (8 tokens)",
+        "ESC : Leave shop"
+    ]
+
+    y = HEIGHT // 2 - 80
+    for line in lines:
+        txt = ui.render(line, True, WHITE)
+        screen.blit(txt, (WIDTH // 2 - txt.get_width() // 2, y))
+        y += 32
+
+    now = pygame.time.get_ticks()
+    if now - last_shop_action < shop_cd_ms:
+        return
+
+    # ❤️ HEAL
+    if keys[pygame.K_e]:
+        last_shop_action = now
+        if tokens >= 3 and hp < max_hp:
+            tokens -= 3
+            hp += 1
+            buy_sound.play()
+            popup_msg = "+1 HP bought"
+        else:
+            error_sound.play()
+            popup_msg = "Cannot heal"
+        popup_until = now + 1200
+
+    # ⚔️ DAMAGE
+    if keys[pygame.K_r]:
+        last_shop_action = now
+        if tokens >= 5:
+            tokens -= 5
+            damage_bonus += 1
+            buy_sound.play()
+            popup_msg = "+1 damage bought"
+        else:
+            error_sound.play()
+            popup_msg = "Not enough tokens"
+        popup_until = now + 1200
+
+    # 💖 MAX HP
+    if keys[pygame.K_t]:
+        last_shop_action = now
+        if tokens >= 8:
+            tokens -= 8
+            max_hp += 1
+            hp = max_hp
+            buy_sound.play()
+            popup_msg = "+1 max HP bought"
+        else:
+            error_sound.play()
+            popup_msg = "Not enough tokens"
+        popup_until = now + 1200
+
+
+
 
 def draw_debug_hud():
     room = rooms[current_room]
@@ -728,6 +886,9 @@ for room_name in rooms:
     for d in rooms[room_name]["doors"]:
         d["img"] = door_img
 
+shop_action = None
+
+
 # Main loop
 
 
@@ -739,11 +900,17 @@ while running:
     for ev in pygame.event.get():
         if ev.type == pygame.QUIT:
             running = False
+
         elif ev.type == pygame.KEYDOWN:
             if ev.key == pygame.K_F3:
                 DEBUG = not DEBUG
+
             if ev.key == pygame.K_m:
                 menu_open = not menu_open
+
+
+
+
 
     keys = pygame.key.get_pressed()
 
@@ -754,13 +921,18 @@ while running:
             running = False
 
         if keys[pygame.K_r]:
-            player_rect.center = (ROOM_WIDTH // 2, ROOM_HEIGHT // 2)
-            hp = max_hp
-            tokens = 0
-            has_metal_spear = False
-            current_room = "starting_room"
+            runs_played += 1
+            reset_run()
 
-            for name in rooms:
+        menu_open = False
+
+            # player_rect.center = (ROOM_WIDTH // 2, ROOM_HEIGHT // 2)
+            # hp = max_hp
+            # tokens = 0
+            # has_metal_spear = False
+            # current_room = "starting_room"
+
+        for name in rooms:
                 if name == "starting_room":
                     rooms[name]["enemies"] = []
                 else:
@@ -768,7 +940,7 @@ while running:
                         random.randint(2, 5), speed=2
                     )
 
-            menu_open = False
+        menu_open = False
 
     else:
         handle_input(keys)
@@ -780,6 +952,14 @@ while running:
         draw_room()
         draw_player()
         draw_hud()
+        draw_room_name()
+        draw_minimap()
+
+        if current_room == "shop_room":
+            handle_shop(keys)
+
+
+
 
         if DEBUG:
             draw_debug_hud()
@@ -791,99 +971,3 @@ while running:
 
     pygame.display.flip()
     clock.tick(60)
-
-
-# running = True
-# while running:
-#     for ev in pygame.event.get():
-#         if ev.type == pygame.QUIT:
-#             running = False
-#         elif ev.type == pygame.KEYDOWN:
-#             if ev.key == pygame.K_F3:
-#                 DEBUG = not DEBUG
-
-#             if ev.key == pygame.K_m:
-#              menu_open = not menu_open
-
-
-
-#     keys = pygame.key.get_pressed()
-#     if not menu_open:
-#         handle_input(keys)
-
-#     if keys[pygame.K_SPACE]:
-#         try_attack()
-
-#     update_enemies()
-#     draw_room()
-#     draw_player()
-#     draw_hud()
-# else:
-#     draw_menu()
-
-#     if DEBUG:
-#        draw_debug_hud()
-#     process_collisions(keys)
-
-# if menu_open:
-#     if keys[pygame.K_ESCAPE]:
-#         running = False
-
-#     if keys[pygame.K_r]:
-#         # reset game
-#         player_rect.center = (ROOM_WIDTH // 2, ROOM_HEIGHT // 2)
-#         hp = max_hp
-#         tokens = 0
-#         has_metal_spear = False
-#         current_room = "starting_room"
-
-#         for name in rooms:
-#             if name == "starting_room":
-#                 rooms[name]["enemies"] = []
-#             else:
-#                 rooms[name]["enemies"] = make_enemies(random.randint(2, 5), speed=2)
-
-#         menu_open = False
-
-#     if hp <= 0:
-#         # Game over scherm
-#         screen.fill(DARK)
-#         over1 = title.render("You suck a googus", True, (255,200,200))
-#         over2 = ui.render("Enter: opnieuw beginnen | Esc: afsluiten", True, WHITE)
-#         screen.blit(over1, over1.get_rect(center=(WIDTH//2, HEIGHT//2 - 20)))
-#         screen.blit(over2, over2.get_rect(center=(WIDTH//2, HEIGHT//2 + 24)))
-#         pygame.display.flip()
-#         waiting = True 
-#         while waiting:
-#             for ev in pygame.event.get():
-#                 if ev.type == pygame.QUIT:
-#                     waiting = False
-#                     running = False
-#             k = pygame.key.get_pressed()
-#             if k[pygame.K_RETURN]:
-#                 # reset spel
-#                 player_rect.update(0, 0, 40, 56)
-#                 player_rect.center = (ROOM_WIDTH // 2, ROOM_HEIGHT // 2)
-
-#                 hp = max_hp
-#                 tokens = 0
-#                 has_metal_spear = False
-#                 # respawn enemies
-#                 for name in rooms:
-#                     if name == "starting_room":
-#                         rooms[name]["enemies"] = []
-                    
-#                     else:
-#                         rooms[name]["enemies"] = make_enemies(random.randint(1,3),speed=2
-#                     )
-#                 current_room = "starting_room"
-#                 waiting = False
-#             elif k[pygame.K_ESCAPE]:
-#                 waiting = False
-#                 running = False
-
-#     pygame.display.flip()
-#     clock.tick(60)
-
-# pygame.quit()
-
