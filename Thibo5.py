@@ -19,9 +19,8 @@ attack_hit_done = False
 
 dodge_cd = 10000      # cooldown ms
 dodge_time = 2000    # hoe lang dodge duurt
-last_dodge = -9999
+last_dodge = -9999  # meteen dodgen bij start
 is_dodging = False
-
 blink_interval = 80  # ms tussen aan/uit
 
 
@@ -37,6 +36,8 @@ ROOM_WIDTH, ROOM_HEIGHT = 1800, 1200
 
 ui = pygame.font.SysFont(None, 32)
 title = pygame.font.SysFont(None, 56)
+info_font = pygame.font.SysFont(None, 22)
+hint_font = pygame.font.SysFont(None, 44)
 
 menu_open = False
 
@@ -91,13 +92,24 @@ door_img = pygame.transform.scale(door_img, (80, 100))  # pas grootte aan
 bedroom_bg = pygame.image.load("projectweek-09-whomp-whomp/img/bedroom.png").convert_alpha()
 bedroom_bg = pygame.transform.scale(bedroom_bg, (ROOM_WIDTH, ROOM_HEIGHT))  # full-room background
 
+torture_bg = pygame.image.load("projectweek-09-whomp-whomp\img\Torture chamber.png").convert_alpha()
+torture_bg = pygame.transform.scale(torture_bg, (ROOM_WIDTH, ROOM_HEIGHT))
 
+library_bg = pygame.image.load("projectweek-09-whomp-whomp\img\library.png").convert_alpha()
+library_bg = pygame.transform.scale(library_bg, (ROOM_WIDTH, ROOM_HEIGHT))
+
+basement_bg = pygame.image.load("projectweek-09-whomp-whomp/img/basement.png").convert_alpha()
+basement_bg = pygame.transform.scale(basement_bg, (ROOM_WIDTH, ROOM_HEIGHT))
 
 start_bg = pygame.image.load(("projectweek-09-whomp-whomp\img\Startscherm.jpg")).convert_alpha()
 start_bg = pygame.transform.scale(start_bg, (WIDTH, HEIGHT))
 
 floor_bg = pygame.image.load(("projectweek-09-whomp-whomp\img\stone.jpg")).convert_alpha()
 floor_bg = pygame.transform.scale(floor_bg, (WIDTH, HEIGHT))
+
+corridor_bg = pygame.image.load("projectweek-09-whomp-whomp/img/corridor.png").convert_alpha()
+corridor_bg = pygame.transform.scale(corridor_bg, (ROOM_WIDTH, ROOM_HEIGHT))
+
 
 frame_width, frame_height = 64, 64
 player_spritesheet = pygame.image.load("projectweek-09-whomp-whomp\img\character-spritesheet (2).png").convert_alpha()
@@ -214,43 +226,88 @@ popup_msg = None
 popup_until = 0
 damage_bonus = 0
 
+BOSS_ROOM_NUMBERS = {
+    5: "mini_boss",
+    10: "mini_boss",
+    15: "mini_boss",
+    20: "final_boss"
+}
+
+# (optioneel) cache zodat we frames niet telkens opnieuw schalen
+_scaled_cache = {}
+def get_scaled_frames(frames, w, h):
+    key = (id(frames), w, h)
+    if key not in _scaled_cache:
+        _scaled_cache[key] = [pygame.transform.scale(f, (w, h)) for f in frames]
+    return _scaled_cache[key]
+
 def make_enemy(x, y, enemy_type="skeleton"):
     if enemy_type == "skeleton":
         frames = skeleton_frames
+        w, h = 42, 42
         hp = 3
         speed = 2
         damage = 1
+        attack_cd = 800
+        token_drop = 1
 
     elif enemy_type == "zombie":
         frames = zombie_frames
+        w, h = 42, 42
         hp = 5
         speed = 1
         damage = 1
+        attack_cd = 900
+        token_drop = 1
 
     elif enemy_type == "werewolf":
         frames = werewolf_frames
+        w, h = 42, 42
         hp = 4
         speed = 3
         damage = 2
+        attack_cd = 700
+        token_drop = 1
 
-    rect = pygame.Rect(x, y, 42, 42)
+    elif enemy_type == "mini_boss":
+        # gebruik bv werewolf animatie maar groter + sterker
+        w, h = 96, 96
+        frames = get_scaled_frames(werewolf_frames, w, h)
+        hp = 18
+        speed = 2
+        damage = 3
+        attack_cd = 600
+        token_drop = 5
+
+    elif enemy_type == "final_boss":
+        w, h = 130, 130
+        frames = get_scaled_frames(werewolf_frames, w, h)
+        hp = 45
+        speed = 2
+        damage = 4
+        attack_cd = 450
+        token_drop = 12
+
+    rect = pygame.Rect(x, y, w, h)
 
     return {
-    "type": enemy_type,
-    "rect": rect,
-    "pos": pygame.Vector2(rect.center),   # <-- toevoegen (float center)
-    "hp": hp,
-    "max_hp": hp,
-    "speed": speed,
-    "frames": frames,
-    "frame": 0,
-    "frame_timer": pygame.time.get_ticks(),
-    "dead": False,
-    "attack_cd": 800,
-    "last_attack": 0,
-    "damage": damage,
-    "aggro_range": int((ROOM_WIDTH**2 + ROOM_HEIGHT**2) ** 0.5)  # <-- groter (kamer-diagonaal)
-}
+        "type": enemy_type,
+        "rect": rect,
+        "pos": pygame.Vector2(rect.center),
+        "hp": hp,
+        "max_hp": hp,
+        "speed": speed,
+        "frames": frames,
+        "frame": 0,
+        "frame_timer": pygame.time.get_ticks(),
+        "dead": False,
+        "attack_cd": attack_cd,
+        "last_attack": 0,
+        "damage": damage,
+        "aggro_range": int((ROOM_WIDTH**2 + ROOM_HEIGHT**2) ** 0.5),
+        "token_drop": token_drop
+    }
+
 
 
 
@@ -373,6 +430,17 @@ for i, room_name in enumerate(HAUNTED_ROOMS):
     }
     if room_name == "abandoned_bedroom":
         rooms[room_name]["bg"] = bedroom_bg
+    if room_name == "torture_chamber":
+        rooms[room_name]["bg"] = torture_bg
+    if room_name == "creepy_library":
+        rooms[room_name]["bg"] = library_bg
+    if room_name == "spider_corridor":
+        rooms[room_name]["bg"] = corridor_bg
+    if room_name == "dark_basement":
+        rooms[room_name]["bg"] = basement_bg
+
+
+
 
 
     # deur terug naar vorige room
@@ -396,8 +464,23 @@ for i, room_name in enumerate(HAUNTED_ROOMS):
             "target": HAUNTED_ROOMS[i + 1],
             "spawn": spawn_from_door(next_door)
         })
+        room_number = i + 1  # 1..20
 
-current_room = "abandoned_bedroom"
+    if room_number in BOSS_ROOM_NUMBERS:
+        boss_type = BOSS_ROOM_NUMBERS[room_number]
+
+        boss = make_enemy(0, 0, boss_type)
+        boss["rect"].center = (ROOM_WIDTH // 2, ROOM_HEIGHT // 2)
+        boss["pos"] = pygame.Vector2(boss["rect"].center)
+
+        rooms[room_name]["enemies"] = [boss]
+
+        # extra minions bij final boss (optioneel)
+        if boss_type == "final_boss":
+            rooms[room_name]["enemies"] += make_enemies(3)
+
+
+current_room = "starting_room"
 
 # ======================
 # SHOP ROOM
@@ -417,6 +500,62 @@ rooms["shop_room"]["doors"].append({
     "spawn": spawn_from_door(back_door)
 })
 
+def show_info_screen():
+    info_lines = [
+        "DOEL:",
+        "- Verken alle kamers.",
+        "- Versla monsters om deuren te unlocken.",
+        "- Versla bosses op level 5, 10, 15 en FINAL BOSS op level 20.",
+        "",
+        "TOKENS & SHOP:",
+        "- Monsters droppen tokens.",
+        "- In de shop kan je upgraden met tokens.",
+        "- Shop vind je via de deur in de starting room (onderaan).",
+        "",
+        "BESTURING:",
+        "- Bewegen: WASD of pijltjes",
+        "- Aanvallen: SPACE",
+        "- Dodge: LEFT SHIFT (heeft cooldown)",
+        "- Menu: M",
+        "- Shop: E = heal, R = damage, T = max HP, ESC = weg",
+        "",
+        "Druk ENTER of ESC om terug te gaan..."
+    ]
+
+    opened_at = pygame.time.get_ticks()
+
+    info_running = True
+    while info_running:
+        for ev in pygame.event.get():
+            if ev.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if ev.type == pygame.KEYDOWN:
+                # kleine delay zodat ENTER van vorige scherm niet meteen sluit
+                if pygame.time.get_ticks() - opened_at > 200:
+                    if ev.key == pygame.K_RETURN or ev.key == pygame.K_ESCAPE:
+                        info_running = False
+
+        screen.blit(start_bg, (0, 0))
+
+        overlay = pygame.Surface((WIDTH, HEIGHT))
+        overlay.set_alpha(170)
+        overlay.fill((0, 0, 0))
+        screen.blit(overlay, (0, 0))
+
+        screen.blit(title.render("INFO & CONTROLS", True, YELLOW), (WIDTH//2 - 220, 40))
+
+        y = 120
+        for line in info_lines:
+            txt = info_font.render(line, True, WHITE)
+            screen.blit(txt, (60, y))
+            y += 22
+
+        pygame.display.flip()
+        clock.tick(60)
+
+
 
 
 def show_start_screen_and_ask_name():
@@ -430,14 +569,28 @@ def show_start_screen_and_ask_name():
             if ev.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
+
             if ev.type == pygame.KEYDOWN:
                 if ev.key == pygame.K_RETURN:
-                    title_running = False  # Exit the title screen
+                    title_running = False
+                elif ev.key == pygame.K_i:
+                    show_info_screen()  # <- deze functie moet bestaan
 
+
+        
+        
         screen.blit(start_bg, (0, 0))
         screen.blit(title.render("Frankenstein mansion", True, WHITE), (250, 80))
-        screen.blit(ui.render("Druk ENTER om te starten", True, YELLOW), (320, 520))
+
+        enter_text = ui.render("Druk ENTER om te starten", True, YELLOW)
+        screen.blit(enter_text, enter_text.get_rect(center=(WIDTH//2, 520)))
+
+        hint_text = hint_font.render("Druk I voor info & controls", True, WHITE)
+        screen.blit(hint_text, hint_text.get_rect(center=(WIDTH//2, HEIGHT//2)))
+
+
         pygame.display.flip()
+
         clock.tick(60)
 
     # --- Ask for player name ---
@@ -823,7 +976,7 @@ def apply_attack_damage():
             if e["hp"] <= 0 and not e["dead"]:
                 e["dead"] = True
                 enemy_death_sound.play()
-                tokens += 1
+                tokens += e.get("token_drop", 1)
                 popup_msg = "+1 token"
                 popup_until = pygame.time.get_ticks() + 1200
 
