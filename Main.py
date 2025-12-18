@@ -1,8 +1,10 @@
-import pygame, sys, random
+import pygame, sys, random, os
 pygame.init()
 pygame.mixer.init()
 
-DEBUG = True
+# ================= PADEN =================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+IMG_DIR = os.path.join(BASE_DIR, "img")
 
 shop_cd_ms = 300
 last_shop_action = 0
@@ -35,18 +37,26 @@ def reset_run():
 
 
 WIDTH, HEIGHT = 900, 600
+ROOM_WIDTH, ROOM_HEIGHT = 1600, 1200
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Hotel Transylvania")
 clock = pygame.time.Clock()
 WALL_THICKNESS = 30
 
-ROOM_WIDTH, ROOM_HEIGHT = 1800, 1200
+# ================= AFBEELDINGEN =================
+start_bg = pygame.image.load(("img\Startscherm.jpg")).convert_alpha()
+start_bg = pygame.transform.scale(start_bg, (WIDTH, HEIGHT))
 
+floor_bg = pygame.image.load(("img\stone.jpg")).convert_alpha()
+floor_bg = pygame.transform.scale(floor_bg, (WIDTH, HEIGHT))
+
+player_sheet = pygame.image.load("img\player.png").convert_alpha()
+
+# ================= FONTS =================
 ui = pygame.font.SysFont(None, 32)
-title = pygame.font.SysFont(None, 56)
+title = pygame.font.SysFont(None, 56,)
 
-menu_open = False
-
+# ================= KLEUREN =================
 WHITE = (255,255,255)
 RED = (230,50,50)
 GREEN = (80,220,120)
@@ -54,23 +64,8 @@ YELLOW = (230,200,60)
 BROWN = (120,80,40)
 DARK = (20,10,22)
 
-def load_skeleton_frames(sheet, frame_w, frame_h):
-    frames = []
-    sheet_width, sheet_height = sheet.get_size()
-    for y in range(0, sheet_height, frame_h):
-        for x in range(0, sheet_width, frame_w):
-            if x + frame_w <= sheet_width and y + frame_h <= sheet_height:
-                frames.append(
-                    sheet.subsurface(pygame.Rect(x, y, frame_w, frame_h)).copy()
-                )
-    return frames
-
-
-
-# Playerplayer_rect = pyg
-# Start in het midden van de kamer, rekening houdend met muren
-player_rect = pygame.Rect(0, 0, 40, 56)
-player_rect.center = (ROOM_WIDTH // 2, ROOM_HEIGHT // 2)
+# ================= PLAYER =================
+player_rect = pygame.Rect(WIDTH//2-20, HEIGHT//2-28, 40, 56)
 player_speed = 5
 player_dir = "down"
 max_hp = 10
@@ -114,25 +109,17 @@ error_sound.set_volume(0.4)
 def load_spritesheet(sheet, frame_w, frame_h):
     sheet_width, sheet_height = sheet.get_size()
     frames = []
-    for y in range(0, sheet_height, frame_h):
+    for y in range(0, sheet.get_height(), fh):
         row = []
-        for x in range(0, sheet_width, frame_w):
-            row.append(sheet.subsurface(pygame.Rect(x, y, frame_w, frame_h)))
+        for x in range(0, sheet.get_width(), fw):
+            row.append(sheet.subsurface(pygame.Rect(x,y,fw,fh)))
         frames.append(row)
     return frames
 
-player_sprites = load_spritesheet(player_spritesheet, frame_width, frame_height)
+player_sprites = load_sprites(player_sheet, 64, 64)
+DIR_ROW = {"down":0,"left":1,"right":2,"up":3}
 
-# Map directions to sheet rows
-DIRECTION_ROW = {
-    "down": 0,
-    "left": 1,
-    "right": 2,
-    "up": 3
-}
-
-
-# Combat / progression
+# ================= COMBAT =================
 tokens = 0
 has_metal_spear = False
 wood_damage = 1
@@ -368,6 +355,14 @@ def get_camera():
     cam_y = max(0, min(cam_y, ROOM_HEIGHT - HEIGHT))
     return cam_x, cam_y
 
+def draw_walls():
+    cam_x, cam_y = get_camera()
+    for wall in get_room_walls():
+        draw_rect = wall.copy()
+        draw_rect.x -= cam_x
+        draw_rect.y -= cam_y
+        pygame.draw.rect(screen, (70, 70, 70), draw_rect)
+
 def get_room_walls():
     return [
         # Top wall
@@ -383,11 +378,15 @@ def get_room_walls():
         pygame.Rect(ROOM_WIDTH - WALL_THICKNESS, 0, WALL_THICKNESS, ROOM_HEIGHT),
     ]
 
-def draw_menu():
-    overlay = pygame.Surface((WIDTH, HEIGHT))
-    overlay.set_alpha(220)
-    overlay.fill((10, 10, 20))
-    screen.blit(overlay, (0, 0))
+# ================= ENEMIES =================
+def make_enemy(x,y,hp=3,speed=2):
+    return {
+        "rect": pygame.Rect(x,y,42,42),
+        "hp": hp,
+        "max_hp": hp,
+        "dx": random.choice([-speed,speed]),
+        "dy": random.choice([-speed,speed])
+    }
 
     title_text = title.render("HAUNTED HOUSE", True, WHITE)
     screen.blit(title_text, title_text.get_rect(center=(WIDTH//2, 80)))
@@ -435,45 +434,122 @@ def draw_menu():
         y += 28
 
 
+# ================= ROOMS =================
+# rooms = {
+#     "starting_room":{
+#         "doors":[{"rect":pygame.Rect(760,20,80,90),"target":"lobby","spawn":(200,HEIGHT//2)}],
+#         "enemies":[]
+#     },
+#     "lobby":{
+#         "doors":[{"rect":pygame.Rect(WIDTH-110,HEIGHT//2-55,80,110),
+#                   "target":"kitchen","spawn":(200,HEIGHT//2)}],
+#         "enemies":make_enemies(random.randint(1,2),3)
+#     },
+#     "kitchen":{
+#         "doors":[
+#             {"rect":pygame.Rect(30,HEIGHT//2-55,80,110),"target":"lobby","spawn":(WIDTH-200,HEIGHT//2)},
+#             {"rect":pygame.Rect(WIDTH-110,60,80,110),"target":"library","spawn":(WIDTH//2,HEIGHT-160)}
+#         ],
+#         "enemies":make_enemies(random.randint(2,5),2)
+#     },
+#     "library":{
+#         "doors":[{"rect":pygame.Rect(WIDTH//2-40,HEIGHT-100,80,80),
+#                   "target":"kitchen","spawn":(WIDTH-200,HEIGHT//2)}],
+#         "enemies":make_enemies(random.randint(1,3),1)
+#     }
+# }
 
-def draw_walls():
-    cam_x, cam_y = get_camera()
-    for wall in get_room_walls():
-        draw_rect = wall.copy()
-        draw_rect.x -= cam_x
-        draw_rect.y -= cam_y
-        pygame.draw.rect(screen, (70, 70, 70), draw_rect)
+rooms = {
+    "starting_room": {
+        "color": (55, 188, 31),
+        "doors": [
+            {"rect": pygame.Rect(1000, 50, 80, 90), "target": "lobby", "spawn": (2500, 1500)},
+        ],
+        "enemies": [],
+    },
 
-def draw_floor():
-    cam_x, cam_y = get_camera()
+    "lobby": {
+        "color": (41,90,96),
+        "doors": [{"rect": pygame.Rect(100, 50, 70, 100), "target": "starting_room", "spawn": (200,200)},
+                  {"rect": pygame.Rect(300, 50, 70, 100), "target": "hallway right", "spawn": (200,200)},
+                  {"rect": pygame.Rect(500, 50, 70, 100), "target": "hallway left", "spawn": (200,200)}], 
+        "enemies": make_enemies(random.randint(1,2), speed=2), 
+    },
 
-    tile_w = floor_bg.get_width()
-    tile_h = floor_bg.get_height()
+    "hallway right": {
+        "color": (41,90,96),
+        "doors": [{"rect": pygame.Rect(WIDTH//2-40, 50, 70, 100), "target": "lobby", "spawn": (200,200)}
+        ], 
+        "enemies": make_enemies(random.randint(1,2), speed=2), 
+    },
 
-    start_x = -(cam_x % tile_w)
-    start_y = -(cam_y % tile_h)
+     "hallway left": {
+        "color": (41,90,96),
+        "doors": [{"rect": pygame.Rect(WIDTH//2-40, 50, 70, 100), "target": "lobby", "spawn": (200,200)}
+        ], 
+        "enemies": make_enemies(random.randint(1,2), speed=2), 
+    },
 
-    for x in range(start_x, WIDTH, tile_w):
-        for y in range(start_y, HEIGHT, tile_h):
-            screen.blit(floor_bg, (x, y))
+    # --- FINAL WING ---
+    "crypt": {
+        "color": (30, 30, 30),
+        "doors": [
+            {"rect": pygame.Rect(WIDTH-110, HEIGHT//2-55, 80, 110), "target": "chapel", "spawn": (200,200)},
+        ],
+        "enemies": make_enemies(random.randint(4, 6), 4),
+    },
 
+    "chapel": {
+        "color": (200, 200, 160),
+        "doors": [
+            {"rect": pygame.Rect(30, HEIGHT//2-55, 80, 110), "target": "crypt", "spawn": (WIDTH-140, HEIGHT//2)},
+            {"rect": pygame.Rect(WIDTH//2-40, 20, 80, 90), "target": "boss_room", "spawn": (WIDTH//2, HEIGHT-140)},
+        ],
+        "enemies": make_enemies(random.randint(3, 5), 4),
+    },
 
+    "boss_room": {
+        "color": (120, 0, 0),
+        "doors": [],
+        "enemies": make_enemies(1, 1),
+    },
+}
+
+current_room = "starting_room"
+
+# ================= CAMERA =================
+def camera():
+    return (
+        max(0, min(player_rect.centerx-WIDTH//2, ROOM_WIDTH-WIDTH)),
+        max(0, min(player_rect.centery-HEIGHT//2, ROOM_HEIGHT-HEIGHT))
+    )
+
+# ================= HUD =================
 def draw_hud():
-    # hearts
     for i in range(max_hp):
-        col = (220,60,60) if i < hp else (90,40,40)
-        x = 16 + i*22
-        pygame.draw.circle(screen, col, (x, 18), 8)
-        pygame.draw.circle(screen, col, (x+10, 18), 8)
-        pygame.draw.polygon(screen, col, [(x-5, 22), (x+15, 22), (x+5, 34)])
-    # tokens and weapon
-    weapon = "Metal spear" if has_metal_spear else "Wooden spear"
-    info = f"Tokens: {tokens} | Weapon: {weapon}"
-    screen.blit(ui.render(info, True, WHITE), (16, 50))
-    # popup
+        col = RED if i < hp else (90,40,40)
+        pygame.draw.circle(screen,col,(20+i*22,20),8)
+
+    info = f"Tokens: {tokens} | Weapon: {'Metal' if has_metal_spear else 'Wood'}"
+    screen.blit(ui.render(info,True,WHITE),(16,45))
+
     if popup_msg and pygame.time.get_ticks() < popup_until:
-        surf = ui.render(popup_msg, True, YELLOW)
-        screen.blit(surf, (16, 80))
+        screen.blit(ui.render(popup_msg,True,YELLOW),(16,75))
+
+# ================= INPUT =================
+def handle_input(keys):
+    global player_dir, player_frame
+    vx = vy = 0
+    moving = False
+
+    if keys[pygame.K_q]: vx=-player_speed; player_dir="left"; moving=True
+    if keys[pygame.K_d]: vx= player_speed; player_dir="right"; moving=True
+    if keys[pygame.K_z]: vy=-player_speed; player_dir="up"; moving=True
+    if keys[pygame.K_s]: vy= player_speed; player_dir="down"; moving=True
+    if keys[pygame.K_LEFT]:vx = -player_speed; player_dir = "left"; moving = True
+    if keys[pygame.K_RIGHT]: vx = player_speed ; player_dir = "right"; moving = True
+    if keys[pygame.K_UP]:vy = -player_speed; player_dir = "up"; moving = True
+    if keys[pygame.K_DOWN]:vy= player_speed; player_dir = "down"; moving = True
 
 def draw_minimap():
     map_w, map_h = 220, 140
@@ -529,42 +605,13 @@ def draw_room_name():
     screen.blit(room_text, (x, y))
 
 
-
-
-
-
-def draw_player():
-    global player_frame
-    cam_x, cam_y = get_camera()
-    frame_index = int(player_frame) % len(player_sprites[DIRECTION_ROW[player_dir]])
-    img = player_sprites[DIRECTION_ROW[player_dir]][frame_index]
-    draw_rect = player_rect.copy()
-    draw_rect.x -= cam_x
-    draw_rect.y -= cam_y
-    screen.blit(img, draw_rect)
-
-def move_player(vx, vy):
-    # Move X axis
     player_rect.x += vx
-    for wall in get_room_walls():
-        if player_rect.colliderect(wall):
-            if vx > 0:
-                player_rect.right = wall.left
-            elif vx < 0:
-                player_rect.left = wall.right
-
-    # Move Y axis
     player_rect.y += vy
-    for wall in get_room_walls():
-        if player_rect.colliderect(wall):
-            if vy > 0:
-                player_rect.bottom = wall.top
-            elif vy < 0:
-                player_rect.top = wall.bottom
+    player_rect.clamp_ip(pygame.Rect(0,0,ROOM_WIDTH,ROOM_HEIGHT))
 
+    player_frame = player_frame + animation_speed if moving else 0
 
-
-
+# ================= ATTACK =================
 def attack_rect():
     r = player_rect
     if player_dir == "up":
@@ -584,8 +631,7 @@ def try_attack():
     global last_attack, tokens, has_metal_spear, popup_msg, popup_until
 
     now = pygame.time.get_ticks()
-    if now - last_attack < attack_cd_ms:
-        return
+    if now-last_attack < attack_cd_ms: return
     last_attack = now
 
     hb = attack_rect()
@@ -643,7 +689,9 @@ def handle_damage(amount=1):
     now = pygame.time.get_ticks()
     if now - last_hit >= invul_ms:
         last_hit = now
-        hp -= amount
+        hp -= 1
+    if hp <= 0:
+        game_over(player_name)
 
 def room_cleared(room_name):
     for e in rooms[room_name]["enemies"]:
@@ -681,88 +729,47 @@ def process_collisions(keys):
 def switch_room(target, spawn=None):
     global current_room
     current_room = target
-    if spawn:
-        player_rect.center = safe_spawn(spawn)
-    else:
-        player_rect.center = (ROOM_WIDTH // 2, ROOM_HEIGHT // 2)
+    player_rect.center = spawn
 
+def process_doors(keys):
+    for d in rooms[current_room]["doors"]:
+        if player_rect.colliderect(d["rect"]) and keys[pygame.K_e]:
+            switch_room(d["target"], d["spawn"])
 
-
-def handle_input(keys):
-    global player_dir, player_frame
-
-    vx = vy = 0
-    moving = False
-
-    if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-        vx = -player_speed
-        player_dir = "left"
-
-    if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-        vx = player_speed
-        player_dir = "right"
-
-    if keys[pygame.K_UP] or keys[pygame.K_w]:
-        vy = -player_speed
-        player_dir = "up"
-
-    if keys[pygame.K_DOWN] or keys[pygame.K_s]:
-        vy = player_speed
-        player_dir = "down"
-
-    # check of we bewegen
-    if vx != 0 or vy != 0:
-        moving = True
-
-    move_player(vx, vy)
-
-    # animatie
-    if moving:
-        player_frame += animation_speed
-    else:
-        player_frame = 0
-
+# ================= DRAW =================
 def draw_room():
-    room = rooms[current_room]
-    cam_x, cam_y = get_camera()
+    camx,camy = camera()
+    screen.blit(floor_bg,(0,0))
 
-    # Floor en walls
-    draw_floor()
-    draw_walls()
+    for d in rooms[current_room]["doors"]:
+        r=d["rect"].move(-camx,-camy)
+        pygame.draw.rect(screen,YELLOW,r,3)
 
-    # Doors
-    for d in room["doors"]:
-        draw_rect = d["rect"].copy()
-        draw_rect.x -= cam_x
-        draw_rect.y -= cam_y
-        # Gebruik de afbeelding van de deur
-        if "img" in d:
-            screen.blit(d["img"], draw_rect.topleft)
-        else:
-            pygame.draw.rect(screen, YELLOW, draw_rect, border_radius=6)
-            pygame.draw.rect(screen, BROWN, draw_rect, 3, border_radius=6)
-        # toon de kamernaam erboven
-        tag = ui.render(d["target"], True, WHITE)
-        screen.blit(tag, (draw_rect.centerx - tag.get_width()//2, draw_rect.top - 24))
+    for e in rooms[current_room]["enemies"]:
+        if e["hp"]>0:
+            r=e["rect"].move(-camx,-camy)
+            pygame.draw.rect(screen,GREEN,r)
 
-    # Enemies
-    for e in room["enemies"]:
-        if e["hp"] > 0:
-            draw_rect = e["rect"].copy()
-            draw_rect.x -= cam_x
-            draw_rect.y -= cam_y
-            # animatie frame
-            img = skeleton_frames[e["frame"]]
-            screen.blit(img, draw_rect)
+def draw_player():
+    camx,camy = camera()
+    img = player_sprites[DIR_ROW[player_dir]][int(player_frame)%4]
+    screen.blit(img,(player_rect.x-camx,player_rect.y-camy))
 
-            # health bar
-            hp_ratio = e["hp"] / e["max_hp"]
-            bar_w = draw_rect.width
-            bar_h = 5
-            bar_x = draw_rect.x
-            bar_y = draw_rect.y - 8
-            pygame.draw.rect(screen, (120, 0, 0), (bar_x, bar_y, bar_w, bar_h))
-            pygame.draw.rect(screen, (0, 200, 0), (bar_x, bar_y, bar_w * hp_ratio, bar_h))
+# ================= STARTSCREENS =================
+def ask_name():
+    name = ""
+    while True:
+        screen.blit(start_bg, (0,0))
+        screen.blit(ui.render("Vul hier je naam in: " + name, True, WHITE), (300,550))
+        pygame.display.flip()
+        for e in pygame.event.get():
+            if e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_RETURN:
+                    return name  # <-- teruggeven van de ingevoerde naam
+                elif e.key == pygame.K_BACKSPACE:
+                    name = name[:-1]
+                elif e.unicode.isprintable():
+                    name += e.unicode
 
 def draw_center_message(text, color=RED):
     surf = ui.render(text, True, color)
@@ -846,22 +853,23 @@ def handle_shop(keys):
 
 
 
-def draw_debug_hud():
-    room = rooms[current_room]
-    cam_x, cam_y = get_camera()
+def start_screen():
+    while True:
+        screen.blit(start_bg,(0,0))
+        screen.blit(title.render("Hotel Transylvania",True,WHITE),(220,80))
+        screen.blit(ui.render("ENTER om te starten",True,YELLOW),(330,520))
+        screen.blit(ui.render("- Gebruik de toetsen zqsd of maak gebruik van de pijltjes.",True,YELLOW),(150,150))
+        screen.blit(ui.render("- Gebruik linkermuisklik om de monsters aan te vallen", True,YELLOW),(150,220))
+        screen.blit(ui.render("- Probeer al de monsters te verslaan, om zo het speel uit te spelen.", True, YELLOW),(150,290))
+        pygame.display.flip()
+        for e in pygame.event.get():
+            if e.type==pygame.KEYDOWN and e.key==pygame.K_RETURN: return
 
-    lines = [
-        f"Room: {current_room}",
-        f"Player world pos: {player_rect.x}, {player_rect.y}",
-        f"Camera pos: {cam_x}, {cam_y}",
-        f"Room size: {ROOM_WIDTH} x {ROOM_HEIGHT}",
-    ]
+# ================= START ================
+player_name = ask_name()
 
-    y = HEIGHT - 20 * len(lines) - 10
-    for line in lines:
-        text = ui.render(line, True, (255, 255, 0))
-        screen.blit(text, (10, y))
-        y += 20
+# ================= MAIN =================
+start_screen()
 
     # Enemies
     for e in room["enemies"]:
@@ -913,12 +921,17 @@ while running:
 
 
     keys = pygame.key.get_pressed()
+    handle_input(keys)
+    process_doors(keys)
+    if keys[pygame.K_SPACE]: try_attack()
 
-    if menu_open:
-        draw_menu()
+    for e in rooms[current_room]["enemies"]:
+        if e["hp"] > 0:
+            e["rect"].x += e["dx"]
+            e["rect"].y += e["dy"]
+        if player_rect.colliderect(e["rect"]):
+            handle_damage()
 
-        if keys[pygame.K_ESCAPE]:
-            running = False
 
         if keys[pygame.K_r]:
             runs_played += 1
