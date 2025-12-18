@@ -1,0 +1,18 @@
+Dag1:
+nassim en tang doorzoeken via ai hotel transylvania film 1,2 en 3 voor wezens en namen,
+maximilien en thibo maken de basis codering voor de kamers en games aan.
+Lander is groeps leider en verdeelt taken + volgd op of ze gedaan worden.
+Lander zal zorgen voor verdeling namen per kamer en moeillijksgraad.
+10 zombies voor starters om te doden voor ze metalen speer krijgen
+eerste zombies te doden met houten speer, ieder monster verslagen is 1 skill token om te gebruiken voor upgrades, van stamina, levens of kracht. einde buiten krijgt speler 
+speler begint buiten, en vecht tot alle monsters dood zijn speler kan enkel op bepaalde checkpoint like; buiten in maze , binnen gelijkvloers, 1ste, 2de, 3de en vierde verdiep kamer1
+speler kan bij het bereiken van vloer 2 de krachten van eindebaas vloer 1 gebruiken zelfde per volgend verdiep alle krachten worden onthouden en herbruikbaar na verloop van tijd.
+dag 2:
+NGtang maakt random chamber locaties code.
+Nassim maakt meerdere vijanden.
+Thibo zorgd ervoor dat we geen blokken meer hebben als figuren maar figuren uit film zelf en foto's.
+maximilien zorgt voor nieuwe wapens, en damage idéeën. wapens worden verzamelt door speler alleen diamanten wapen is vrij uniek ingame en kan de vijand 3x zo snel doden als een gewoon metalen wapen.
+Thibo voegt critical hits, en startscherm toe, zodat het toffer wordt.
+Nassim ontwikkeld eindscherm met uitslagen als iemand dood is.
+
+dag3:

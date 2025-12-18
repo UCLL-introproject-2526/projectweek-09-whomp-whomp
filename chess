@@ -1,0 +1,738 @@
+import pygame, sys
+from math import inf
+
+# --- Config ---
+WIDTH, HEIGHT = 720, 720
+ROWS, COLS = 8, 8
+SQ = WIDTH // COLS
+FPS = 60
+
+LIGHT=(240,217,181); DARK=(181,136,99)
+HILITE=(80,180,80); SELECT=(80,130,220)
+LASTMOVE=(220,220,90); CHECK=(220,80,80)
+BG=(38,38,38); OVERLAY_BG=(20,20,20)
+OVERLAY_ACCENT=(60,140,240)
+
+pygame.init()
+screen=pygame.display.set_mode((WIDTH,HEIGHT))
+pygame.display.set_caption("ChessBot Full Rules + Endscreen")
+clock=pygame.time.Clock()
+FONT=pygame.font.SysFont("segoe ui symbol",40)
+PIECE_FONT=pygame.font.SysFont("segoe ui symbol",48)
+SMALL=pygame.font.SysFont("consolas",18)
+MED=pygame.font.SysFont("consolas",22)
+BIG=pygame.font.SysFont("consolas",28)
+
+# --- Board setup ---
+def start_board():
+    b=[[None]*8 for _ in range(8)]
+    b[0]=[('R','b'),('N','b'),('B','b'),('Q','b'),('K','b'),('B','b'),('N','b'),('R','b')]
+    b[1]=[('P','b')]*8
+    for r in range(2,6): b[r]=[None]*8
+    b[6]=[('P','w')]*8
+    b[7]=[('R','w'),('N','w'),('B','w'),('Q','w'),('K','w'),('B','w'),('N','w'),('R','w')]
+    return b
+
+def inside(r,c): return 0<=r<8 and 0<=c<8
+
+class Move:
+    __slots__=("sr","sc","tr","tc","piece","capture","promo","castle","enpassant","prev_state")
+    def __init__(self,sr,sc,tr,tc,piece,capture=None,promo=None,castle=None,enpassant=False,prev_state=None):
+        self.sr=sr; self.sc=sc; self.tr=tr; self.tc=tc
+        self.piece=piece; self.capture=capture
+        self.promo=promo; self.castle=castle; self.enpassant=enpassant
+        self.prev_state=prev_state
+
+class Game:
+    def __init__(self):
+        self.board=start_board(); self.white_to_move=True
+        self.move_log=[]; self.wcastle_k=True; self.wcastle_q=True
+        self.bcastle_k=True; self.bcastle_q=True
+        self.enpassant=None; self.halfmove=0; self.fullmove=1
+        self.last_move=None; self.position_counts={}; self.result=None
+        self.record_position()
+    def fen_core(self):
+        rows=[]
+        for r in range(8):
+            empt=0; row=""
+            for c in range(8):
+                p=self.board[r][c]
+                if not p: empt+=1
+                else:
+                    if empt: row+=str(empt); empt=0
+                    t,col=p; row+=t if col=='w' else t.lower()
+            if empt: row+=str(empt)
+            rows.append(row)
+        board_part="/".join(rows)
+        stm='w' if self.white_to_move else 'b'
+        castle=""
+        if self.wcastle_k: castle+="K"
+        if self.wcastle_q: castle+="Q"
+        if self.bcastle_k: castle+="k"
+        if self.bcastle_q: castle+="q"
+        if not castle: castle="-"
+        ep="-"
+        if self.enpassant:
+            files="abcdefgh"; ranks="12345678"
+            er,ec=self.enpassant; ep=f"{files[ec]}{ranks[7-er]}"
+        return f"{board_part} {stm} {castle} {ep}"
+    def record_position(self):
+        core=self.fen_core()
+        self.position_counts[core]=self.position_counts.get(core,0)+1
+
+# --- Move generation helpers ---
+DIRS_KNIGHT=[(2,1),(2,-1),(-2,1),(-2,-1),(1,2),(1,-2),(-1,2),(-1,-2)]
+DIRS_BISHOP=[(1,1),(1,-1),(-1,1),(-1,-1)]
+DIRS_ROOK=[(1,0),(-1,0),(0,1),(0,-1)]
+DIRS_KING=[(1,0),(-1,0),(0,1),(0,-1),(1,1),(1,-1),(-1,1),(-1,-1)]
+# --- Move building and checks ---
+def build_move(g, sr, sc, tr, tc):
+    piece = g.board[sr][sc]
+    capture = g.board[tr][tc]
+    return Move(sr, sc, tr, tc, piece, capture=capture)
+
+def find_king(g, color):
+    for r in range(8):
+        for c in range(8):
+            p = g.board[r][c]
+            if p and p[0]=='K' and p[1]==color:
+                return (r,c)
+    return None
+
+def square_attacked(g, r, c, by_color):
+    # Pawn
+    dir = -1 if by_color=='w' else 1
+    for dc in (-1,1):
+        rr, cc = r - dir, c - dc
+        if 0 <= rr < 8 and 0 <= cc < 8 and g.board[rr][cc] == ('P', by_color):
+            return True
+    # Knight
+    for dr, dc in DIRS_KNIGHT:
+        rr, cc = r+dr, c+dc
+        if 0 <= rr < 8 and 0 <= cc < 8 and g.board[rr][cc] == ('N', by_color):
+            return True
+    # Bishop/Queen diagonals
+    for dr, dc in DIRS_BISHOP:
+        rr, cc = r+dr, c+dc
+        while 0 <= rr < 8 and 0 <= cc < 8:
+            p = g.board[rr][cc]
+            if p:
+                if p[1]==by_color and p[0] in ('B','Q'):
+                    return True
+                break
+            rr += dr; cc += dc
+    # Rook/Queen lines
+    for dr, dc in DIRS_ROOK:
+        rr, cc = r+dr, c+dc
+        while 0 <= rr < 8 and 0 <= cc < 8:
+            p = g.board[rr][cc]
+            if p:
+                if p[1]==by_color and p[0] in ('R','Q'):
+                    return True
+                break
+            rr += dr; cc += dc
+    # King
+    for dr, dc in DIRS_KING:
+        rr, cc = r+dr, c+dc
+        if 0 <= rr < 8 and 0 <= cc < 8 and g.board[rr][cc] == ('K', by_color):
+            return True
+    return False
+
+def in_check(g, color):
+    k = find_king(g, color)
+    if not k: return False
+    return square_attacked(g, k[0], k[1], 'w' if color=='b' else 'b')
+
+# --- Move generation ---
+def pawn_moves(g, r, c, color):
+    res = []
+    dir = -1 if color == 'w' else 1
+    start_row = 6 if color == 'w' else 1
+    # forward
+    fr, fc = r+dir, c
+    if 0 <= fr < 8 and g.board[fr][fc] is None:
+        res.append(build_move(g,r,c,fr,fc))
+        fr2 = r+2*dir
+        if r == start_row and g.board[fr2][fc] is None:
+            res.append(build_move(g,r,c,fr2,fc))
+    # captures
+    for dc in (-1,1):
+        tr, tc = r+dir, c+dc
+        if 0 <= tr < 8 and 0 <= tc < 8:
+            target = g.board[tr][tc]
+            if target and target[1] != color:
+                res.append(build_move(g,r,c,tr,tc))
+    # en passant
+    if g.enpassant:
+        er, ec = g.enpassant
+        if er == r+dir and abs(ec - c) == 1:
+            m = build_move(g, r, c, er, ec)
+            m.enpassant = True
+            res.append(m)
+    # promotion tagging
+    end_row = 0 if color == 'w' else 7
+    for m in res:
+        if m.tr == end_row:
+            m.promo = 'Q'  # default; UI lets human change
+    return res
+
+def jump_moves(g, r, c, color, dirs):
+    res = []
+    for dr, dc in dirs:
+        tr, tc = r+dr, c+dc
+        if 0 <= tr < 8 and 0 <= tc < 8:
+            target = g.board[tr][tc]
+            if target is None or target[1] != color:
+                res.append(build_move(g,r,c,tr,tc))
+    return res
+
+def slide_moves(g, r, c, color, dirs):
+    res = []
+    for dr, dc in dirs:
+        tr, tc = r+dr, c+dc
+        while 0 <= tr < 8 and 0 <= tc < 8:
+            target = g.board[tr][tc]
+            if target is None:
+                res.append(build_move(g,r,c,tr,tc))
+            else:
+                if target[1] != color:
+                    res.append(build_move(g,r,c,tr,tc))
+                break
+            tr += dr; tc += dc
+    return res
+
+def king_moves(g, r, c, color):
+    res = []
+    for dr, dc in DIRS_KING:
+        tr, tc = r+dr, c+dc
+        if 0 <= tr < 8 and 0 <= tc < 8:
+            target = g.board[tr][tc]
+            if target is None or target[1] != color:
+                res.append(build_move(g,r,c,tr,tc))
+    # Castling (only from original king square)
+    if color == 'w' and (r,c) == (7,4):
+        # king-side
+        if g.wcastle_k and g.board[7][5] is None and g.board[7][6] is None:
+            if not square_attacked(g,7,4,'b') and not square_attacked(g,7,5,'b') and not square_attacked(g,7,6,'b'):
+                m = build_move(g,7,4,7,6); m.castle='K'; res.append(m)
+        # queen-side
+        if g.wcastle_q and g.board[7][1] is None and g.board[7][2] is None and g.board[7][3] is None:
+            if not square_attacked(g,7,4,'b') and not square_attacked(g,7,3,'b') and not square_attacked(g,7,2,'b'):
+                m = build_move(g,7,4,7,2); m.castle='Q'; res.append(m)
+    if color == 'b' and (r,c) == (0,4):
+        if g.bcastle_k and g.board[0][5] is None and g.board[0][6] is None:
+            if not square_attacked(g,0,4,'w') and not square_attacked(g,0,5,'w') and not square_attacked(g,0,6,'w'):
+                m = build_move(g,0,4,0,6); m.castle='K'; res.append(m)
+        if g.bcastle_q and g.board[0][1] is None and g.board[0][2] is None and g.board[0][3] is None:
+            if not square_attacked(g,0,4,'w') and not square_attacked(g,0,3,'w') and not square_attacked(g,0,2,'w'):
+                m = build_move(g,0,4,0,2); m.castle='Q'; res.append(m)
+    return res
+
+def gen_moves(g: Game):
+    color = 'w' if g.white_to_move else 'b'
+    moves = []
+    for r in range(8):
+        for c in range(8):
+            p = g.board[r][c]
+            if not p or p[1] != color: continue
+            t = p[0]
+            if t == 'P': moves += pawn_moves(g, r, c, color)
+            elif t == 'N': moves += jump_moves(g, r, c, color, DIRS_KNIGHT)
+            elif t == 'B': moves += slide_moves(g, r, c, color, DIRS_BISHOP)
+            elif t == 'R': moves += slide_moves(g, r, c, color, DIRS_ROOK)
+            elif t == 'Q': moves += slide_moves(g, r, c, color, DIRS_ROOK + DIRS_BISHOP)
+            elif t == 'K': moves += king_moves(g, r, c, color)
+
+    legal = []
+    for m in moves:
+        # Official rule: a king cannot be captured.
+        if m.capture and m.capture[0] == 'K':
+            continue
+        # simulate move to check legality (no result detection during simulation)
+        if make_move(g, m, simulate=True):
+            # after make_move, side to move is flipped; ensure new side's king not in check
+            if not in_check(g, 'w' if g.white_to_move else 'b'):
+                legal.append(m)
+            undo_move(g, m)
+    return legal
+
+# --- Make/undo moves with safe simulation ---
+def make_move(g: Game, m: Move, simulate=False):
+    if g.result and not simulate:
+        return False
+
+    m.prev_state = (
+        [row[:] for row in g.board],
+        g.white_to_move,
+        g.wcastle_k, g.wcastle_q, g.bcastle_k, g.bcastle_q,
+        g.enpassant,
+        g.halfmove, g.fullmove,
+        g.last_move,
+        dict(g.position_counts),
+        g.result
+    )
+
+    sr, sc, tr, tc = m.sr, m.sc, m.tr, m.tc
+    piece = g.board[sr][sc]
+
+    # halfmove clock
+    if piece[0]=='P' or m.capture:
+        g.halfmove = 0
+    else:
+        g.halfmove += 1
+
+    # en passant capture
+    if m.enpassant:
+        if piece[1]=='w':
+            g.board[tr+1][tc] = None
+        else:
+            g.board[tr-1][tc] = None
+
+    # move piece
+    g.board[tr][tc] = piece
+    g.board[sr][sc] = None
+
+    # promotion
+    if m.promo:
+        g.board[tr][tc] = (m.promo, piece[1])
+
+    # castling rook move
+    if m.castle == 'K':
+        if piece[1]=='w':
+            g.board[7][5] = g.board[7][7]; g.board[7][7] = None
+        else:
+            g.board[0][5] = g.board[0][7]; g.board[0][7] = None
+    elif m.castle == 'Q':
+        if piece[1]=='w':
+            g.board[7][3] = g.board[7][0]; g.board[7][0] = None
+        else:
+            g.board[0][3] = g.board[0][0]; g.board[0][0] = None
+
+    # castling rights: king moved
+    if piece == ('K','w'):
+        g.wcastle_k = g.wcastle_q = False
+    if piece == ('K','b'):
+        g.bcastle_k = g.bcastle_q = False
+
+    # castling rights: rook moved
+    if piece == ('R','w'):
+        if (sr,sc) == (7,0): g.wcastle_q = False
+        if (sr,sc) == (7,7): g.wcastle_k = False
+    if piece == ('R','b'):
+        if (sr,sc) == (0,0): g.bcastle_q = False
+        if (sr,sc) == (0,7): g.bcastle_k = False
+
+    # castling rights: rook captured
+    if m.capture == ('R','w'):
+        if (tr,tc) == (7,0): g.wcastle_q = False
+        if (tr,tc) == (7,7): g.wcastle_k = False
+    if m.capture == ('R','b'):
+        if (tr,tc) == (0,0): g.bcastle_q = False
+        if (tr,tc) == (0,7): g.bcastle_k = False
+
+    # en passant target
+    g.enpassant = None
+    if piece[0]=='P' and abs(tr - sr) == 2:
+        g.enpassant = ((sr + tr)//2, sc)
+
+    # switch turn
+    g.white_to_move = not g.white_to_move
+    if not g.white_to_move:
+        g.fullmove += 1
+    g.last_move = m
+
+    # commit side effects only for real moves
+    if not simulate:
+        g.move_log.append(m)
+        g.record_position()
+        detect_game_end(g)
+
+    return True
+
+def undo_move(g: Game, m: Move):
+    if not m.prev_state: return
+    (board, wtm, wk, wq, bk, bq, ep, hm, fm, lm, pos_counts, result) = m.prev_state
+    g.board = [row[:] for row in board]
+    g.white_to_move = wtm
+    g.wcastle_k, g.wcastle_q = wk, wq
+    g.bcastle_k, g.bcastle_q = bk, bq
+    g.enpassant = ep
+    g.halfmove = hm
+    g.fullmove = fm
+    g.last_move = lm
+    g.position_counts = dict(pos_counts)
+    g.result = result
+    if g.move_log and g.move_log[-1] == m:
+        g.move_log.pop()
+
+# --- Evaluation ---
+PIECE_VALUES = {'P':100,'N':320,'B':330,'R':500,'Q':900,'K':0}
+PST = {
+    'P':[0,0,0,10,10,0,0,0, 5,5,5,20,20,5,5,5, 1,1,2,10,10,2,1,1, 0,0,0,8,8,0,0,0, 0,0,0,5,5,0,0,0, 1,1,1,2,2,1,1,1, 5,5,5,-5,-5,5,5,5, 0,0,0,0,0,0,0,0],
+    'N':[-10,-5,-5,-5,-5,-5,-5,-10, -5,0,0,5,5,0,0,-5, -5,0,10,10,10,10,0,-5, -5,0,10,20,20,10,0,-5, -5,0,10,20,20,10,0,-5, -5,0,10,10,10,10,0,-5, -5,0,0,5,5,0,0,-5, -10,-5,-5,-5,-5,-5,-5,-10],
+    'B':[-5,-2,-2,-2,-2,-2,-2,-5, -2,5,0,5,5,0,5,-2, -2,0,10,10,10,10,0,-2, -2,5,10,15,15,10,5,-2, -2,5,10,15,15,10,5,-2, -2,0,10,10,10,10,0,-2, -2,5,0,5,5,0,5,-2, -5,-2,-2,-2,-2,-2,-2,-5],
+    'R':[0,0,0,5,5,0,0,0, 0,0,0,10,10,0,0,0, 0,0,5,10,10,5,0,0, 5,5,5,10,10,5,5,5, 5,5,5,10,10,5,5,5, 0,0,5,10,10,5,0,0, 0,0,0,10,10,0,0,0, 0,0,0,5,5,0,0,0],
+    'Q':[-5,-5,-5,0,0,-5,-5,-5, -5,0,0,0,0,0,0,-5, -5,0,5,5,5,5,0,-5, 0,0,5,5,5,5,0,0, 0,0,5,5,5,5,0,0, -5,0,5,5,5,5,0,-5, -5,0,0,0,0,0,0,-5, -5,-5,-5,0,0,-5,-5,-5],
+    'K':[20,30,10,0,0,10,30,20, 20,20,0,0,0,0,20,20, 10,0,-10,-15,-15,-10,0,10, 0,0,-15,-20,-20,-15,0,0, 0,0,-15,-20,-20,-15,0,0, 10,0,-10,-15,-15,-10,0,10, 20,20,0,0,0,0,20,20, 20,30,10,0,0,10,30,20]
+}
+
+def eval_board(g: Game):
+    score = 0
+    for r in range(8):
+        for c in range(8):
+            p = g.board[r][c]
+            if not p: continue
+            val = PIECE_VALUES[p[0]]
+            idx = r*8 + c
+            psb = PST[p[0]][idx] if p[1]=='w' else PST[p[0]][(7-r)*8 + (7-c)]
+            score += (val + psb) if p[1]=='w' else -(val + psb)
+    # tiny mobility bonus
+    wm = len(pseudo_legal_count(g, 'w'))
+    bm = len(pseudo_legal_count(g, 'b'))
+    score += 2*(wm - bm)
+    return score
+
+def pseudo_legal_count(g: Game, color):
+    saved = g.white_to_move
+    g.white_to_move = (color=='w')
+    moves = []
+    for r in range(8):
+        for c in range(8):
+            p = g.board[r][c]
+            if not p or p[1]!=color: continue
+            t = p[0]
+            if t == 'P': moves += pawn_moves(g, r, c, color)
+            elif t == 'N': moves += jump_moves(g, r, c, color, DIRS_KNIGHT)
+            elif t == 'B': moves += slide_moves(g, r, c, color, DIRS_BISHOP)
+            elif t == 'R': moves += slide_moves(g, r, c, color, DIRS_ROOK)
+            elif t == 'Q': moves += slide_moves(g, r, c, color, DIRS_ROOK + DIRS_BISHOP)
+            elif t == 'K': moves += king_moves(g, r, c, color)
+    g.white_to_move = saved
+    return moves
+
+# --- Minimax with alpha-beta ---
+def minimax(g: Game, depth, alpha=-inf, beta=inf):
+    if g.result:
+        if "wins" in g.result:
+            return (100000 if "White" in g.result else -100000), None
+        else:
+            return 0, None
+
+    legal = gen_moves(g)
+    if depth == 0 or not legal:
+        if not legal:
+            side = 'w' if g.white_to_move else 'b'
+            if in_check(g, side):
+                return (100000 if side=='b' else -100000), None
+            else:
+                return 0, None
+        return eval_board(g), None
+
+    maximizing = g.white_to_move
+    best_move = None
+    # simple move ordering: captures first
+    legal.sort(key=lambda m: (m.capture is not None), reverse=True)
+
+    if maximizing:
+        best = -inf
+        for m in legal:
+            make_move(g, m, simulate=True)
+            score, _ = minimax(g, depth-1, alpha, beta)
+            undo_move(g, m)
+            if score > best:
+                best = score; best_move = m
+            alpha = max(alpha, best)
+            if beta <= alpha: break
+        return best, best_move
+    else:
+        best = inf
+        for m in legal:
+            make_move(g, m, simulate=True)
+            score, _ = minimax(g, depth-1, alpha, beta)
+            undo_move(g, m)
+            if score < best:
+                best = score; best_move = m
+            beta = min(beta, best)
+            if beta <= alpha: break
+        return best, best_move
+
+# --- End conditions ---
+def insufficient_material(g: Game):
+    bishops_w = []; bishops_b = []
+    knights = {'w':0, 'b':0}
+    rooks = {'w':0, 'b':0}
+    queens = {'w':0, 'b':0}
+    pawns = {'w':0, 'b':0}
+    kings = {'w':0, 'b':0}
+
+    for r in range(8):
+        for c in range(8):
+            p = g.board[r][c]
+            if not p: continue
+            t, col = p
+            if t == 'B':
+                (bishops_w if col=='w' else bishops_b).append((r+c)%2)
+            elif t == 'N':
+                knights[col] += 1
+            elif t == 'R':
+                rooks[col] += 1
+            elif t == 'Q':
+                queens[col] += 1
+            elif t == 'P':
+                pawns[col] += 1
+            elif t == 'K':
+                kings[col] += 1
+
+    if pawns['w'] or pawns['b'] or rooks['w'] or rooks['b'] or queens['w'] or queens['b']:
+        return False
+
+    total_pieces = kings['w'] + kings['b'] + sum(knights.values()) + len(bishops_w) + len(bishops_b)
+    if total_pieces == 2:  # K vs K
+        return True
+
+    if total_pieces == 3 and (knights['w']+knights['b'] + len(bishops_w) + len(bishops_b) == 1):
+        return True
+
+    if total_pieces == 4 and (len(bishops_w)+len(bishops_b) == 2) and (knights['w']+knights['b'] == 0):
+        colors = bishops_w + bishops_b
+        return len(colors) == 2 and colors[0] == colors[1]
+
+    return False
+
+def detect_game_end(g: Game):
+    # 50-move rule
+    if g.halfmove >= 100:
+        g.result = "Draw by 50-move rule"; return
+
+    # Threefold repetition
+    core = g.fen_core()
+    if g.position_counts.get(core, 0) >= 3:
+        g.result = "Draw by threefold repetition"; return
+
+    # Insufficient material
+    if insufficient_material(g):
+        g.result = "Draw by insufficient material"; return
+
+    # Stalemate or checkmate
+    legal = gen_moves(g)
+    if not legal:
+        side = 'w' if g.white_to_move else 'b'
+        if in_check(g, side):
+            g.result = f"{'Black' if side=='w' else 'White'} wins by checkmate"
+        else:
+            g.result = "Draw by stalemate"
+# --- UI / Rendering ---
+PIECE_GLYPH = {
+    ('K','w'): "♔", ('Q','w'): "♕", ('R','w'): "♖", ('B','w'): "♗", ('N','w'): "♘", ('P','w'): "♙",
+    ('K','b'): "♚", ('Q','b'): "♛", ('R','b'): "♜", ('B','b'): "♝", ('N','b'): "♞", ('P','b'): "♟",
+}
+
+def draw_board(g: Game, selected=None, legal_moves=None):
+    screen.fill(BG)
+    # squares
+    for r in range(8):
+        for c in range(8):
+            color = LIGHT if (r+c)%2==0 else DARK
+            pygame.draw.rect(screen, color, (c*SQ, r*SQ, SQ, SQ))
+    # last move
+    if g.last_move:
+        lm = g.last_move
+        pygame.draw.rect(screen, LASTMOVE, (lm.sc*SQ, lm.sr*SQ, SQ, SQ), width=4)
+        pygame.draw.rect(screen, LASTMOVE, (lm.tc*SQ, lm.tr*SQ, SQ, SQ), width=4)
+    # check highlight on side to move
+    side = 'w' if g.white_to_move else 'b'
+    if in_check(g, side):
+        kr, kc = find_king(g, side)
+        if kr is not None:
+            pygame.draw.rect(screen, CHECK, (kc*SQ, kr*SQ, SQ, SQ), width=4)
+    # selection and legal target dots
+    if selected:
+        sr, sc = selected
+        pygame.draw.rect(screen, SELECT, (sc*SQ, sr*SQ, SQ, SQ), width=4)
+    if legal_moves:
+        for m in legal_moves:
+            x = m.tc*SQ + SQ//2
+            y = m.tr*SQ + SQ//2
+            pygame.draw.circle(screen, HILITE if not (m.capture or m.enpassant) else (200,50,50), (x,y), 10)
+    # pieces
+    for r in range(8):
+        for c in range(8):
+            p = g.board[r][c]
+            if not p: continue
+            glyph = PIECE_GLYPH[p]
+            color = (25,25,25) if p[1]=='w' else (5,5,5)
+            surf = PIECE_FONT.render(glyph, True, color)
+            rect = surf.get_rect(center=(c*SQ+SQ//2, r*SQ+SQ//2))
+            screen.blit(surf, rect)
+
+def draw_status(g: Game, bot_side, depth):
+    status = f"{'White' if g.white_to_move else 'Black'} to move | Bot: {'White' if bot_side=='w' else 'Black'} | Depth: {depth}"
+    surf = SMALL.render(status, True, (230,230,230))
+    screen.blit(surf, (8, 8))
+    if g.result:
+        res_surf = BIG.render(g.result, True, (240,220,80))
+        rect = res_surf.get_rect(center=(WIDTH//2, 20))
+        screen.blit(res_surf, rect)
+
+def draw_promotion_overlay(color):
+    overlay_rect = pygame.Rect(WIDTH//2 - 160, HEIGHT//2 - 80, 320, 160)
+    pygame.draw.rect(screen, OVERLAY_BG, overlay_rect, border_radius=10)
+    title = MED.render("Choose promotion piece", True, (230,230,230))
+    screen.blit(title, (overlay_rect.x + 16, overlay_rect.y + 12))
+    pieces = ['Q','R','B','N']
+    buttons = []
+    for i, t in enumerate(pieces):
+        glyph = PIECE_GLYPH[(t, color)]
+        bx = overlay_rect.x + 20 + i*75
+        by = overlay_rect.y + 60
+        rect = pygame.Rect(bx, by, 60, 60)
+        pygame.draw.rect(screen, OVERLAY_ACCENT, rect, border_radius=8)
+        gsurf = FONT.render(glyph, True, (250,250,250))
+        grect = gsurf.get_rect(center=rect.center)
+        screen.blit(gsurf, grect)
+        buttons.append((rect, t))
+    return buttons
+
+def draw_endscreen(g: Game):
+    overlay = pygame.Surface((WIDTH, HEIGHT))
+    overlay.set_alpha(200)
+    overlay.fill((20, 20, 20))
+    screen.blit(overlay, (0, 0))
+
+    result_text = BIG.render(g.result, True, (240, 220, 80))
+    rect = result_text.get_rect(center=(WIDTH//2, HEIGHT//2 - 40))
+    screen.blit(result_text, rect)
+
+    restart_rect = pygame.Rect(WIDTH//2 - 100, HEIGHT//2 + 20, 200, 50)
+    quit_rect = pygame.Rect(WIDTH//2 - 100, HEIGHT//2 + 90, 200, 50)
+
+    pygame.draw.rect(screen, OVERLAY_ACCENT, restart_rect, border_radius=8)
+    pygame.draw.rect(screen, (200, 60, 60), quit_rect, border_radius=8)
+
+    restart_text = MED.render("Restart", True, (255,255,255))
+    quit_text = MED.render("Quit", True, (255,255,255))
+
+    screen.blit(restart_text, restart_text.get_rect(center=restart_rect.center))
+    screen.blit(quit_text, quit_text.get_rect(center=quit_rect.center))
+
+    return restart_rect, quit_rect
+
+# --- Main loop ---
+def main():
+    g = Game()
+    selected = None
+    cached_moves = []
+    bot_side = 'b'
+    depth = 2
+    promotion_buttons = None
+    pending_promotion_move = None
+    restart_rect = None
+    quit_rect = None
+
+    running = True
+    while running:
+        clock.tick(FPS)
+
+        # Bot move
+        if (not g.result) and (bot_side == ('w' if g.white_to_move else 'b')) and (pending_promotion_move is None):
+            _, ai_move = minimax(g, depth)
+            if ai_move:
+                if ai_move.promo: ai_move.promo = 'Q'
+                make_move(g, ai_move, simulate=False)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_u:
+                    if g.move_log:
+                        undo_move(g, g.move_log[-1])
+                        selected = None; cached_moves = []
+                        pending_promotion_move = None; promotion_buttons = None
+                elif event.key == pygame.K_r:
+                    g = Game()
+                    selected = None; cached_moves = []
+                    pending_promotion_move = None; promotion_buttons = None
+                elif event.key == pygame.K_SPACE:
+                    bot_side = 'w' if bot_side == 'b' else 'b'
+                elif event.key == pygame.K_d:
+                    depth = (depth % 4) + 1
+
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                mx, my = event.pos
+
+                # Endscreen buttons
+                if g.result and restart_rect and quit_rect:
+                    if restart_rect.collidepoint(mx, my):
+                        g = Game()
+                        selected = None; cached_moves = []
+                        pending_promotion_move = None; promotion_buttons = None
+                        restart_rect = None; quit_rect = None
+                    elif quit_rect.collidepoint(mx, my):
+                        running = False
+                    continue
+
+                # Promotion overlay click
+                if pending_promotion_move and promotion_buttons:
+                    for rect, t in promotion_buttons:
+                        if rect.collidepoint(mx, my):
+                            pending_promotion_move.promo = t
+                            make_move(g, pending_promotion_move, simulate=False)
+                            pending_promotion_move = None
+                            promotion_buttons = None
+                            selected = None
+                            cached_moves = []
+                            break
+                    continue
+
+                if g.result:
+                    continue
+
+                r, c = my//SQ, mx//SQ
+                if selected is None:
+                    p = g.board[r][c]
+                    if p and ((p[1]=='w' and g.white_to_move) or (p[1]=='b' and not g.white_to_move)):
+                        selected = (r,c)
+                        all_moves = gen_moves(g)
+                        cached_moves = [m for m in all_moves if m.sr==r and m.sc==c]
+                else:
+                    moved = False
+                    for m in cached_moves:
+                        if m.tr == r and m.tc == c:
+                            if m.promo and ((m.piece[1]=='w' and g.white_to_move) or (m.piece[1]=='b' and not g.white_to_move)):
+                                pending_promotion_move = m
+                                promotion_buttons = draw_promotion_overlay(m.piece[1])
+                            else:
+                                make_move(g, m, simulate=False)
+                            moved = True
+                            break
+                    selected = None
+                    cached_moves = []
+                    if not moved:
+                        p = g.board[r][c]
+                        if p and ((p[1]=='w' and g.white_to_move) or (p[1]=='b' and not g.white_to_move)):
+                            selected = (r,c)
+                            all_moves = gen_moves(g)
+                            cached_moves = [m for m in all_moves if m.sr==r and m.sc==c]
+
+        # Draw
+        draw_board(g, selected, cached_moves)
+        draw_status(g, bot_side, depth)
+
+        # Promotion overlay
+        if pending_promotion_move:
+            promotion_buttons = draw_promotion_overlay(pending_promotion_move.piece[1])
+
+        # Endscreen
+        restart_rect = quit_rect = None
+        if g.result:
+            restart_rect, quit_rect = draw_endscreen(g)
+
+        pygame.display.flip()
+
+    pygame.quit()
+    sys.exit()
+
+if __name__ == "__main__":
+    main()
