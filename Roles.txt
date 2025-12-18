@@ -26,3 +26,5 @@ herschrijven code groep,
 mergen Thibo
 aanmaken nieuw spriten Nassim
 code bestuderen Tang en Lander
+dag 5:
+spelen, code overlopen
