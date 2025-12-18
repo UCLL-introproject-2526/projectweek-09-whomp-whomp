@@ -935,7 +935,7 @@ class Game:
         pygame.quit()
         sys.exit()
 
-# ================= ENTRY POINT =================
+# ================= ENTRY POINT =================221WWWWWWWWWWWWWWWWWW
 if __name__ == "__main__":
     game = Game()
     game.run()
