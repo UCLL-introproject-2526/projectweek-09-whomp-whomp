@@ -227,11 +227,12 @@ popup_until = 0
 damage_bonus = 0
 
 BOSS_ROOM_NUMBERS = {
-    5: "mini_boss",
-    10: "mini_boss",
-    15: "mini_boss",
-    20: "final_boss"
+    5: "boss_zombie",
+    10: "boss_skeleton",
+    15: "boss_werewolf",
+    20: "all_bosses"
 }
+
 
 # (optioneel) cache zodat we frames niet telkens opnieuw schalen
 _scaled_cache = {}
@@ -242,9 +243,12 @@ def get_scaled_frames(frames, w, h):
     return _scaled_cache[key]
 
 def make_enemy(x, y, enemy_type="skeleton"):
+    # -------------------------
+    # NORMALE ENEMIES
+    # -------------------------
     if enemy_type == "skeleton":
-        frames = skeleton_frames
         w, h = 42, 42
+        frames = get_scaled_frames(skeleton_frames, w, h)
         hp = 3
         speed = 2
         damage = 1
@@ -252,8 +256,8 @@ def make_enemy(x, y, enemy_type="skeleton"):
         token_drop = 1
 
     elif enemy_type == "zombie":
-        frames = zombie_frames
         w, h = 42, 42
+        frames = get_scaled_frames(zombie_frames, w, h)
         hp = 5
         speed = 1
         damage = 1
@@ -261,16 +265,48 @@ def make_enemy(x, y, enemy_type="skeleton"):
         token_drop = 1
 
     elif enemy_type == "werewolf":
-        frames = werewolf_frames
         w, h = 42, 42
+        frames = get_scaled_frames(werewolf_frames, w, h)
         hp = 4
         speed = 3
         damage = 2
         attack_cd = 700
         token_drop = 1
 
+    # -------------------------
+    # BOSSES (LEVEL 5/10/15)
+    # -------------------------
+    elif enemy_type == "boss_skeleton":
+        w, h = 96, 96
+        frames = get_scaled_frames(skeleton_frames, w, h)
+        hp = 22
+        speed = 2
+        damage = 3
+        attack_cd = 600
+        token_drop = 6
+
+    elif enemy_type == "boss_zombie":
+        w, h = 100, 100
+        frames = get_scaled_frames(zombie_frames, w, h)
+        hp = 28
+        speed = 1
+        damage = 3
+        attack_cd = 750
+        token_drop = 6
+
+    elif enemy_type == "boss_werewolf":
+        w, h = 110, 110
+        frames = get_scaled_frames(werewolf_frames, w, h)
+        hp = 24
+        speed = 3
+        damage = 4
+        attack_cd = 550
+        token_drop = 7
+
+    # -------------------------
+    # (OPTIONEEL) oude types laten staan
+    # -------------------------
     elif enemy_type == "mini_boss":
-        # gebruik bv werewolf animatie maar groter + sterker
         w, h = 96, 96
         frames = get_scaled_frames(werewolf_frames, w, h)
         hp = 18
@@ -287,6 +323,9 @@ def make_enemy(x, y, enemy_type="skeleton"):
         damage = 4
         attack_cd = 450
         token_drop = 12
+
+    else:
+        raise ValueError(f"Unknown enemy_type: {enemy_type}")
 
     rect = pygame.Rect(x, y, w, h)
 
@@ -307,6 +346,7 @@ def make_enemy(x, y, enemy_type="skeleton"):
         "aggro_range": int((ROOM_WIDTH**2 + ROOM_HEIGHT**2) ** 0.5),
         "token_drop": token_drop
     }
+
 
 
 
@@ -491,19 +531,35 @@ for i, room_name in enumerate(HAUNTED_ROOMS):
 
 
     if room_number in BOSS_ROOM_NUMBERS:
-        boss_type = BOSS_ROOM_NUMBERS[room_number]
+        boss_key = BOSS_ROOM_NUMBERS[room_number]
 
-        boss = make_enemy(0, 0, boss_type)
-        boss["rect"].center = (ROOM_WIDTH // 2, ROOM_HEIGHT // 2)
-        boss["pos"] = pygame.Vector2(boss["rect"].center)
+    # --- spawn bosses ---
+        if boss_key == "all_bosses":
+         # level 20: alle bosses samen
+            cx, cy = ROOM_WIDTH // 2, ROOM_HEIGHT // 2
 
-        rooms[room_name]["enemies"] = [boss]
+            b1 = make_enemy(0, 0, "boss_zombie")
+            b1["rect"].center = (cx - 170, cy)
+            b1["pos"] = pygame.Vector2(b1["rect"].center)
 
-        # extra minions bij final boss (optioneel)
-        if boss_type == "final_boss":
-            rooms[room_name]["enemies"] += make_enemies(3)
+            b2 = make_enemy(0, 0, "boss_skeleton")
+            b2["rect"].center = (cx, cy)
+            b2["pos"] = pygame.Vector2(b2["rect"].center)
 
-            # ✅ extra shop deur in boss rooms (altijd open)
+            b3 = make_enemy(0, 0, "boss_werewolf")
+            b3["rect"].center = (cx + 170, cy)
+            b3["pos"] = pygame.Vector2(b3["rect"].center)
+
+            rooms[room_name]["enemies"] = [b1, b2, b3]
+
+        else:
+            # level 5/10/15: 1 boss
+            boss = make_enemy(0, 0, boss_key)
+            boss["rect"].center = (ROOM_WIDTH // 2, ROOM_HEIGHT // 2)
+            boss["pos"] = pygame.Vector2(boss["rect"].center)
+            rooms[room_name]["enemies"] = [boss]
+
+    # ✅ shopdeur in ELKE boss room (altijd open)
         boss_shop_door = random_door_rect("bottom")
         rooms[room_name]["doors"].append({
             "rect": boss_shop_door,
@@ -511,6 +567,7 @@ for i, room_name in enumerate(HAUNTED_ROOMS):
             "spawn": spawn_from_door(boss_shop_door),
             "always_open": True
     })
+
 
 
 
