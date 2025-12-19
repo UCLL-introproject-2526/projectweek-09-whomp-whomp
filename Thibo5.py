@@ -347,6 +347,7 @@ def random_door_rect(side, width=70, height=100):
         x = ROOM_WIDTH - WALL_THICKNESS - width
         y = random.randint(margin, ROOM_HEIGHT - margin - height)
     else:
+
         raise ValueError("Side must be top, bottom, left or right")
 
     return pygame.Rect(x, y, width, height)
