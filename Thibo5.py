@@ -7,6 +7,10 @@ DEBUG = True
 shop_cd_ms = 300
 last_shop_action = 0
 
+NORMAL_ENEMY_SIZE = 64   # <-- pas aan: 64 / 72 / 80
+BOSS_MULT = 2.2          # bosses worden 2.2x zo groot
+
+
 is_attacking = False
 attack_anim_time = 150  # ms
 attack_anim_start = 0
@@ -243,92 +247,44 @@ def get_scaled_frames(frames, w, h):
     return _scaled_cache[key]
 
 def make_enemy(x, y, enemy_type="skeleton"):
-    # -------------------------
-    # NORMALE ENEMIES
-    # -------------------------
+    # --- sizes ---
+    NORMAL_ENEMY_SIZE = 64
+    BOSS_MULT = 2.2
+
     if enemy_type == "skeleton":
-        w, h = 42, 42
+        w = h = NORMAL_ENEMY_SIZE
         frames = get_scaled_frames(skeleton_frames, w, h)
-        hp = 3
-        speed = 2
-        damage = 1
-        attack_cd = 800
-        token_drop = 1
+        hp, speed, damage, attack_cd, token_drop = 3, 2, 1, 800, 1
 
     elif enemy_type == "zombie":
-        w, h = 42, 42
+        w = h = NORMAL_ENEMY_SIZE
         frames = get_scaled_frames(zombie_frames, w, h)
-        hp = 5
-        speed = 1.5
-        damage = 2
-        attack_cd = 900
-        token_drop = 1
+        hp, speed, damage, attack_cd, token_drop = 5, 1.5, 2, 900, 1
 
     elif enemy_type == "werewolf":
-        w, h = 42, 42
+        w = h = NORMAL_ENEMY_SIZE
         frames = get_scaled_frames(werewolf_frames, w, h)
-        hp = 4
-        speed = 2.5
-        damage = 0.5
-        attack_cd = 700
-        token_drop = 1
+        hp, speed, damage, attack_cd, token_drop = 4, 2.5, 0.5, 700, 1
 
-    # -------------------------
-    # BOSSES (LEVEL 5/10/15)
-    # -------------------------
     elif enemy_type == "boss_skeleton":
-        w, h = 96, 96
+        w = h = int(NORMAL_ENEMY_SIZE * BOSS_MULT)
         frames = get_scaled_frames(skeleton_frames, w, h)
-        hp = 22
-        speed = 2
-        damage = 3
-        attack_cd = 600
-        token_drop = 6
+        hp, speed, damage, attack_cd, token_drop = 22, 2, 3, 600, 6
 
     elif enemy_type == "boss_zombie":
-        w, h = 100, 100
+        w = h = int(NORMAL_ENEMY_SIZE * BOSS_MULT)
         frames = get_scaled_frames(zombie_frames, w, h)
-        hp = 28
-        speed = 1
-        damage = 3
-        attack_cd = 750
-        token_drop = 6
+        hp, speed, damage, attack_cd, token_drop = 28, 1, 3, 750, 6
 
     elif enemy_type == "boss_werewolf":
-        w, h = 110, 110
+        w = h = int(NORMAL_ENEMY_SIZE * BOSS_MULT)
         frames = get_scaled_frames(werewolf_frames, w, h)
-        hp = 24
-        speed = 3
-        damage = 4
-        attack_cd = 550
-        token_drop = 7
-
-    # -------------------------
-    # (OPTIONEEL) oude types laten staan
-    # -------------------------
-    elif enemy_type == "mini_boss":
-        w, h = 96, 96
-        frames = get_scaled_frames(werewolf_frames, w, h)
-        hp = 18
-        speed = 2
-        damage = 3
-        attack_cd = 600
-        token_drop = 5
-
-    elif enemy_type == "final_boss":
-        w, h = 130, 130
-        frames = get_scaled_frames(werewolf_frames, w, h)
-        hp = 45
-        speed = 2
-        damage = 4
-        attack_cd = 450
-        token_drop = 12
+        hp, speed, damage, attack_cd, token_drop = 24, 3, 4, 550, 7
 
     else:
         raise ValueError(f"Unknown enemy_type: {enemy_type}")
 
     rect = pygame.Rect(x, y, w, h)
-
     return {
         "type": enemy_type,
         "rect": rect,
@@ -346,6 +302,8 @@ def make_enemy(x, y, enemy_type="skeleton"):
         "aggro_range": int((ROOM_WIDTH**2 + ROOM_HEIGHT**2) ** 0.5),
         "token_drop": token_drop
     }
+
+
 
 
 
