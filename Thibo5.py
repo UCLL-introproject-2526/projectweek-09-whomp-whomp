@@ -42,6 +42,13 @@ hint_font = pygame.font.SysFont(None, 44)
 
 menu_open = False
 
+MINIMAP_COLORS = {
+    'bg': (15, 15, 25),
+    'border': (230, 200, 60),
+    'room_default': (100, 100, 120),
+    'room_current': (80, 220, 120)
+}
+
 WHITE = (255,255,255)
 RED = (230,50,50)
 GREEN = (80,220,120)
@@ -146,7 +153,7 @@ last_hit = -9999
 player_frame = 0.0
 animation_speed= 0.001
 
-door_img = pygame.image.load("projectweek-09-whomp-whomp\img\door3.jpg").convert_alpha()
+door_img = pygame.image.load("img\door3.jpg").convert_alpha()
 door_img = pygame.transform.scale(door_img, (80, 100))  # pas grootte aan
 
 bedroom_bg = pygame.image.load("projectweek-09-whomp-whomp/img/bedroom.png").convert_alpha()
@@ -161,10 +168,10 @@ library_bg = pygame.transform.scale(library_bg, (ROOM_WIDTH, ROOM_HEIGHT))
 basement_bg = pygame.image.load("projectweek-09-whomp-whomp/img/basement.png").convert_alpha()
 basement_bg = pygame.transform.scale(basement_bg, (ROOM_WIDTH, ROOM_HEIGHT))
 
-start_bg = pygame.image.load(("projectweek-09-whomp-whomp\img\Startscherm.jpg")).convert_alpha()
+start_bg = pygame.image.load(("img\Startscherm.jpg")).convert_alpha()
 start_bg = pygame.transform.scale(start_bg, (WIDTH, HEIGHT))
 
-floor_bg = pygame.image.load(("projectweek-09-whomp-whomp\img\stone.jpg")).convert_alpha()
+floor_bg = pygame.image.load(("img\stone.jpg")).convert_alpha()
 floor_bg = pygame.transform.scale(floor_bg, (WIDTH, HEIGHT))
 
 corridor_bg = pygame.image.load("projectweek-09-whomp-whomp/img/corridor.png").convert_alpha()
@@ -172,13 +179,21 @@ corridor_bg = pygame.transform.scale(corridor_bg, (ROOM_WIDTH, ROOM_HEIGHT))
 
 
 frame_width, frame_height = 64, 64
+<<<<<<< HEAD
+player_spritesheet = pygame.image.load("img\player.png").convert_alpha()
+=======
 player_spritesheet = pygame.image.load("projectweek-09-whomp-whomp\img\character-spritesheet (2).png").convert_alpha()
+>>>>>>> c7ac289450cadfaa83b5afda3ec71cffefa4e1ef
 
-skeleton_spritesheet = pygame.image.load("projectweek-09-whomp-whomp\\img\\skeleton.png").convert_alpha()
+skeleton_spritesheet = pygame.image.load("img\\skeleton.png").convert_alpha()
 frame_width, frame_height = 64, 64  # pas aan naar de juiste grootte van één frame
 skeleton_img = skeleton_spritesheet.subsurface(pygame.Rect(0, 0, frame_width, frame_height))
 skeleton_frames = load_skeleton_frames(skeleton_spritesheet, frame_width, frame_height)
 
+<<<<<<< HEAD
+# buy_sound = pygame.mixer.Sound("sounds/buy_1.wav")
+# buy_sound.set_volume(0.6)
+=======
 skeleton_spritesheet = pygame.image.load("projectweek-09-whomp-whomp/img/skeleton.png").convert_alpha()
 werewolf_sheet = pygame.image.load("projectweek-09-whomp-whomp/img/werewolf.png").convert_alpha()
 zombie_sheet = pygame.image.load("projectweek-09-whomp-whomp/img/zombie2.png").convert_alpha()
@@ -203,9 +218,10 @@ zombie_frames = remove_blank_frames(
 
 buy_sound = pygame.mixer.Sound("projectweek-09-whomp-whomp/sounds/buy_1.wav")
 buy_sound.set_volume(0.6)
+>>>>>>> c7ac289450cadfaa83b5afda3ec71cffefa4e1ef
 
-error_sound = pygame.mixer.Sound("projectweek-09-whomp-whomp/sounds/buy_1.wav")  # tijdelijk zelfde sound
-error_sound.set_volume(0.4)
+# error_sound = pygame.mixer.Sound("sounds/buy_1.wav")  # tijdelijk zelfde sound
+# error_sound.set_volume(0.4)
 
 dodge_sound = pygame.mixer.Sound(
     "projectweek-09-whomp-whomp\sounds\swoosh-sound-effects.wav"

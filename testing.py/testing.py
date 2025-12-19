@@ -9,8 +9,16 @@ WIDTH, HEIGHT = 900, 600
 WALL_THICKNESS = 30
 ROOM_WIDTH, ROOM_HEIGHT = 2500, 2000
 FRAME_SIZE = 64
-SPRITE_ROWS = {"down": 0, "left": 1, "right": 2, "up": 3}
+SPRITE_ROWS = {"down": 8, "left": 9, "right": 10, "up": 11}
 ENEMY_ROWS = {"up": 8, "left": 9, "down": 10, "right": 11}
+
+MINIMAP_COLORS = {
+    'bg': (15, 15, 25),
+    'border': (230, 200, 60),
+    'room_default': (100, 100, 120),
+    'room_current': (80, 220, 120)
+}
+
 COLORS = {
     'white': (255, 255, 255),
     'red': (230, 50, 50),
@@ -33,8 +41,17 @@ def load_image(path, scale=None):
     img = pygame.image.load(path).convert_alpha()
     return pygame.transform.scale(img, scale) if scale else img
 
+door_img = load_image("img/door3.jpg", (80, 100))
+
 start_bg = load_image("img/Startscherm.jpg", (WIDTH, HEIGHT))
 floor_bg = load_image("img/stone.jpg", (WIDTH, HEIGHT))
+
+ENEMY_ATTACK_ROWS = {
+    "up": 12,
+    "left": 13,
+    "down": 14,
+    "right": 15
+}
 
 # Load spritesheets
 def load_spritesheet(path, frame_w, frame_h, row_map):
@@ -47,8 +64,22 @@ def load_spritesheet(path, frame_w, frame_h, row_map):
             sprites[direction].append(sheet.subsurface(rect))
     return sprites
 
-player_sprites = load_spritesheet("img/player.png", FRAME_SIZE, FRAME_SIZE, SPRITE_ROWS)
-enemy_sprites = load_spritesheet("img/skeleton.png", FRAME_SIZE, FRAME_SIZE, ENEMY_ROWS)
+player_sprites = load_spritesheet("img\character-spritesheet.png", FRAME_SIZE, FRAME_SIZE, SPRITE_ROWS)
+enemy_types = {
+    "skeleton": load_spritesheet("img\skeleton.png", FRAME_SIZE, FRAME_SIZE, ENEMY_ROWS),
+    "werewolf": load_spritesheet("img\werewolf.png", FRAME_SIZE, FRAME_SIZE, ENEMY_ROWS),
+    "pumpkin": load_spritesheet("img\jack_o_lantern.png", FRAME_SIZE, FRAME_SIZE, ENEMY_ROWS),
+    "zombie": load_spritesheet("img\zombie2.png", FRAME_SIZE, FRAME_SIZE, ENEMY_ROWS),
+}
+enemy_attack_sprites = {
+    name: load_spritesheet(path, FRAME_SIZE, FRAME_SIZE, ENEMY_ATTACK_ROWS)
+    for name, path in {
+        "skeleton": "img\skeleton.png",
+        "werewolf": "img\werewolf.png",
+        "pumpkin": "img\jack_o_lantern.png",
+        "zombie": "img\zombie2.png",
+    }.items()
+}
 
 # Game state
 game_state = {
@@ -81,14 +112,17 @@ combat = {
 }
 
 # Helper functions
-def make_enemy(x, y, hp=3, speed=2):
+def make_enemy(x, y, hp=3, speed=2, kind=None):
     return {
         'rect': pygame.Rect(x, y, 32, 48),
         'hp': hp,
         'max_hp': hp,
         'speed': speed,
         'dir': 'down',
-        'frame': 0.0
+        'frame': 0.0,
+        'type': kind or random.choice(list(enemy_types.keys())),
+        'state': 'walk',          # walk | attack
+        'last_attack': 0
     }
 
 def spawn_enemies(count, speed):
@@ -96,7 +130,9 @@ def spawn_enemies(count, speed):
         make_enemy(
             random.randint(WALL_THICKNESS + 100, ROOM_WIDTH - WALL_THICKNESS - 100),
             random.randint(WALL_THICKNESS + 100, ROOM_HEIGHT - WALL_THICKNESS - 100),
-            hp=3, speed=speed
+            hp=random.randint(2, 5),
+            speed=speed,
+            kind=random.choice(["skeleton", "werewolf", "pumpkin", "zombie"])
         )
         for _ in range(count)
     ]
@@ -122,7 +158,7 @@ rooms = {
             make_door(300, 50, 70, 100, 'hallway right', 200, 200),
             make_door(500, 50, 70, 100, 'hallway left', 200, 200)
         ],
-        'enemies': spawn_enemies(random.randint(10, 50), 5)
+        'enemies': spawn_enemies(random.randint(100, 100), 5)
     },
     'hallway right': {
         'color': (41, 90, 96),
@@ -154,6 +190,11 @@ rooms = {
     }
 }
 
+
+for room_name in rooms:
+    for d in rooms[room_name]["doors"]:
+        d["img"] = door_img
+        
 # Camera system
 def get_camera():
     cam_x = max(0, min(player['rect'].centerx - WIDTH // 2, ROOM_WIDTH - WIDTH))
@@ -202,6 +243,7 @@ def handle_input(keys):
     player['frame'] = (player['frame'] + 0.2) if (vx or vy) else int(player['frame'])
 
 def update_enemies():
+    now = pygame.time.get_ticks()
     for e in rooms[game_state['current_room']]['enemies']:
         if e['hp'] <= 0:
             continue
@@ -210,9 +252,28 @@ def update_enemies():
         dy = player['rect'].centery - e['rect'].centery
         dist = max(1, (dx*dx + dy*dy) ** 0.5)
         
-        move_entity(e['rect'], int(e['speed'] * dx / dist), int(e['speed'] * dy / dist))
         e['dir'] = update_direction(dx, dy)
-        e['frame'] = (e['frame'] + 0.2) % 9
+
+        # ATTACK RANGE
+        if dist < 10:
+            e['state'] = 'attack'
+            if now - e['last_attack'] > 800:
+                e['last_attack'] = now
+                e['frame'] = 0.0
+
+                # Damage player ONCE per attack
+                if now - player['last_hit'] >= player['invul_ms']:
+                    player['last_hit'] = now
+                    player['hp'] -= 1
+        else:
+            e['state'] = 'walk'
+            move_entity(
+                e['rect'],
+                int(e['speed'] * dx / max(1, dist)),
+                int(e['speed'] * dy / max(1, dist))
+            )
+
+        e['frame'] = (e['frame'] + 0.25) % 9
 
 # Combat system
 def get_attack_rect():
@@ -301,8 +362,7 @@ def draw_room():
         r = door['rect'].copy()
         r.x -= cam_x
         r.y -= cam_y
-        pygame.draw.rect(screen, COLORS['yellow'], r, border_radius=6)
-        pygame.draw.rect(screen, COLORS['brown'], r, 3, border_radius=6)
+        screen.blit(door['img'], r.topleft)
         tag = ui_font.render(door['target'], True, COLORS['white'])
         screen.blit(tag, (r.centerx - tag.get_width()//2, r.top - 24))
 
@@ -312,12 +372,17 @@ def draw_entities():
     # Enemies
     for e in rooms[game_state['current_room']]['enemies']:
         if e['hp'] > 0:
-            draw_sprite(enemy_sprites, e['rect'], e['dir'], e['frame'], cam_x, cam_y)
-            # Health bar
-            ratio = e['hp'] / e['max_hp']
-            x, y = e['rect'].x - cam_x, e['rect'].y - cam_y - 10
-            pygame.draw.rect(screen, COLORS['red'], (x, y, e['rect'].width, 6))
-            pygame.draw.rect(screen, COLORS['green'], (x, y, e['rect'].width * ratio, 6))
+            sprites = enemy_attack_sprites[e['type']]
+        else:
+            sprites = enemy_types[e['type']]
+
+        draw_sprite(sprites, e['rect'], e['dir'], e['frame'], cam_x, cam_y)
+ 
+        # Health bar
+        ratio = e['hp'] / e['max_hp']
+        x, y = e['rect'].x - cam_x, e['rect'].y - cam_y - 10
+        pygame.draw.rect(screen, COLORS['red'], (x, y, e['rect'].width, 6))
+        pygame.draw.rect(screen, COLORS['green'], (x, y, e['rect'].width * ratio, 6))
     
     # Player
     draw_sprite(player_sprites, player['rect'], player['dir'], player['frame'], cam_x, cam_y)
@@ -393,6 +458,35 @@ def show_start_screen():
         pygame.display.flip()
         clock.tick(60)
 
+def draw_minimap():
+    map_w, map_h = 220, 140
+    padding = 12
+
+    x0 = WIDTH - map_w - padding
+    y0 = HEIGHT - map_h - padding
+
+    # achtergrond
+    pygame.draw.rect(screen, MINIMAP_COLORS['bg'], (x0, y0, map_w, map_h))
+    pygame.draw.rect(screen, MINIMAP_COLORS['border'], (x0, y0, map_w, map_h), 2)
+
+    rooms_per_row = 5
+    cell_size = 26
+    gap = 6
+
+    all_rooms = list(rooms.keys())
+
+    for i, room in enumerate(all_rooms):
+        row = i // rooms_per_row
+        col = i % rooms_per_row
+
+        cx = x0 + 12 + col * (cell_size + gap)
+        cy = y0 + 12 + row * (cell_size + gap)
+
+        color = MINIMAP_COLORS['room_current'] if room == game_state['current_room'] else MINIMAP_COLORS['room_default']
+
+        pygame.draw.rect(screen, color, (cx, cy, cell_size, cell_size))
+
+
 def reset_game():
     player.update({
         'rect': pygame.Rect(WIDTH//2-20, HEIGHT//2-28, 40, 56),
@@ -456,6 +550,7 @@ def main():
         draw_entities()
         draw_hud()
         handle_collisions(keys)
+        draw_minimap()
         pygame.display.flip()
         
         if player['hp'] <= 0:
