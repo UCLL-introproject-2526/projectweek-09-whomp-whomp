@@ -526,7 +526,8 @@ for i, room_name in enumerate(HAUNTED_ROOMS):
             random.randint(40, 180)
         ),
         "doors": [],
-        "enemies": make_enemies(random.randint(2, 5))
+        "enemies": make_enemies(enemies_for_room(room_number))
+
     }
 
     ...
