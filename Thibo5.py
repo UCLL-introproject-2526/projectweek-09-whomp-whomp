@@ -259,8 +259,8 @@ def make_enemy(x, y, enemy_type="skeleton"):
         w, h = 42, 42
         frames = get_scaled_frames(zombie_frames, w, h)
         hp = 5
-        speed = 1
-        damage = 1
+        speed = 1.5
+        damage = 2
         attack_cd = 900
         token_drop = 1
 
@@ -268,8 +268,8 @@ def make_enemy(x, y, enemy_type="skeleton"):
         w, h = 42, 42
         frames = get_scaled_frames(werewolf_frames, w, h)
         hp = 4
-        speed = 3
-        damage = 2
+        speed = 2.5
+        damage = 0.5
         attack_cd = 700
         token_drop = 1
 
@@ -811,23 +811,48 @@ def draw_floor():
         for y in range(start_y, HEIGHT, tile_h):
             screen.blit(floor_bg, (x, y))
 
+def draw_heart(cx, cy, color):
+    pygame.draw.circle(screen, color, (cx, cy), 8)
+    pygame.draw.circle(screen, color, (cx + 10, cy), 8)
+    pygame.draw.polygon(screen, color, [(cx - 5, cy + 4), (cx + 15, cy + 4), (cx + 5, cy + 16)])
+
+
 
 def draw_hud():
-    # hearts
+    y = 18
+
     for i in range(max_hp):
-        col = (220,60,60) if i < hp else (90,40,40)
-        x = 16 + i*32
-        pygame.draw.circle(screen, col, (x, 18), 8)
-        pygame.draw.circle(screen, col, (x+10, 18), 8)
-        pygame.draw.polygon(screen, col, [(x-5, 22), (x+15, 22), (x+5, 34)])
-    # tokens and weapon
+        x = 16 + i * 32
+
+        full_col = (220, 60, 60)
+        empty_col = (90, 40, 40)
+
+        # teken eerst een "lege" heart als achtergrond
+        draw_heart(x, y, empty_col)
+
+        remaining = hp - i  # hoeveel HP er nog in dit hartje zit
+
+        if remaining >= 1:
+            # volle heart
+            draw_heart(x, y, full_col)
+
+        elif remaining >= 0.5:
+            # half heart: teken de volle heart maar knip hem half af
+            old_clip = screen.get_clip()
+            # bounding box van jouw heart: van (x-5, y-8) tot (x+15, y+16)
+            screen.set_clip(pygame.Rect(x - 5, y - 8, 10, 24))  # alleen linker helft
+            draw_heart(x, y, full_col)
+            screen.set_clip(old_clip)
+
+    # tokens/weapon (jouw bestaande code)
     weapon = "Metal spear" if has_metal_spear else "Wooden spear"
     info = f"Tokens: {tokens} | Weapon: {weapon}"
     screen.blit(ui.render(info, True, WHITE), (16, 50))
-    # popup
+
     if popup_msg and pygame.time.get_ticks() < popup_until:
         surf = ui.render(popup_msg, True, YELLOW)
         screen.blit(surf, (16, 80))
+
 
 
 def draw_level_indicator():
@@ -1154,7 +1179,8 @@ def handle_damage(amount=1):
     now = pygame.time.get_ticks()
     if now - last_hit >= invul_ms:
         last_hit = now
-        hp -= amount
+        hp = max(0, hp - amount)
+
 
 
 def room_cleared(room_name):
