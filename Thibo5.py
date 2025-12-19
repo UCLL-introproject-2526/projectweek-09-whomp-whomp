@@ -488,7 +488,7 @@ for i, room_name in enumerate(HAUNTED_ROOMS):
 
     }
 
-    ...
+    
     if i < len(HAUNTED_ROOMS) - 1:
         next_door = random_door_rect("right")
         rooms[room_name]["doors"].append({
@@ -496,6 +496,17 @@ for i, room_name in enumerate(HAUNTED_ROOMS):
             "target": HAUNTED_ROOMS[i + 1],
             "spawn": spawn_from_door(next_door)
         })
+
+        # ✅ BACK DOOR (altijd terug kunnen)
+    back_target = "starting_room" if i == 0 else HAUNTED_ROOMS[i - 1]
+    back_door = random_door_rect("left")
+    rooms[room_name]["doors"].append({
+        "rect": back_door,
+        "target": back_target,
+        "spawn": spawn_from_door(back_door),
+       
+    })
+
 
 
     if room_number in BOSS_ROOM_NUMBERS:
