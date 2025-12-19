@@ -93,6 +93,10 @@ animation_speed= 0.001
 door_img = pygame.image.load("projectweek-09-whomp-whomp\img\door3.jpg").convert_alpha()
 door_img = pygame.transform.scale(door_img, (80, 100))  # pas grootte aan
 
+starting_room_bg = pygame.image.load("projectweek-09-whomp-whomp/img/starting_room.png").convert_alpha()
+starting_room_bg = pygame.transform.scale(starting_room_bg, (ROOM_WIDTH, ROOM_HEIGHT))
+
+
 bedroom_bg = pygame.image.load("projectweek-09-whomp-whomp/img/bedroom.png").convert_alpha()
 bedroom_bg = pygame.transform.scale(bedroom_bg, (ROOM_WIDTH, ROOM_HEIGHT))  # full-room background
 
@@ -404,6 +408,7 @@ start_door = random_door_rect("top")
 
 rooms["starting_room"] = {
     "color": (55, 188, 31),
+    "bg": starting_room_bg,   # ✅ toegevoegd
     "doors": [
         {
             "rect": start_door,
@@ -413,6 +418,7 @@ rooms["starting_room"] = {
     ],
     "enemies": []
 }
+
 
 # --- extra deur naar de shop ---
 shop_door = random_door_rect("bottom")
@@ -736,7 +742,7 @@ def draw_menu():
     # GAME OVER TEKST
     if hp <= 0:
         info_lines.extend([
-            f"Jammer {player_name},",
+            f"Jammer {player_name},",   
             "je bent doodgegaan.",
             "",
             "Druk R om opnieuw te beginnen",
