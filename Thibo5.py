@@ -26,7 +26,6 @@ blink_interval = 80  # ms tussen aan/uit
 
 
 
-
 WIDTH, HEIGHT = 900, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Hotel Transylvania")
@@ -42,24 +41,12 @@ hint_font = pygame.font.SysFont(None, 44)
 
 menu_open = False
 
-MINIMAP_COLORS = {
-    'bg': (15, 15, 25),
-    'border': (230, 200, 60),
-    'room_default': (100, 100, 120),
-    'room_current': (80, 220, 120)
-}
-
 WHITE = (255,255,255)
 RED = (230,50,50)
 GREEN = (80,220,120)
 YELLOW = (230,200,60)
 BROWN = (120,80,40)
 DARK = (20,10,22)
-
-# --- ROOM TRANSITION (fade) ---
-FADE_MS = 220
-fade_surface = pygame.Surface((WIDTH, HEIGHT))
-fade_surface.fill((0, 0, 0))
 
 def load_skeleton_frames(sheet, frame_w, frame_h):
     frames = []
@@ -82,60 +69,6 @@ def remove_blank_frames(frames, min_alpha=1):
     return cleaned
 
 
-def render_scene_for_transition():
-    """Teken 1 frame van de huidige game-state (zonder collision/updates)."""
-    draw_room()
-    draw_player()
-    draw_hud()
-    draw_top_right_info()
-    draw_level_indicator()
-    if DEBUG:
-        draw_debug_hud()
-
-def fade_out(duration_ms=FADE_MS):
-    start = pygame.time.get_ticks()
-    while True:
-        # window responsive houden
-        for ev in pygame.event.get():
-            if ev.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-
-        t = (pygame.time.get_ticks() - start) / duration_ms
-        if t >= 1:
-            t = 1
-
-        alpha = int(255 * t)
-        fade_surface.set_alpha(alpha)
-        screen.blit(fade_surface, (0, 0))
-        pygame.display.flip()
-        clock.tick(60)
-
-        if t >= 1:
-            break
-
-def fade_in(duration_ms=FADE_MS):
-    start = pygame.time.get_ticks()
-    while True:
-        for ev in pygame.event.get():
-            if ev.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-
-        t = (pygame.time.get_ticks() - start) / duration_ms
-        if t >= 1:
-            t = 1
-
-        alpha = int(255 * (1 - t))
-        fade_surface.set_alpha(alpha)
-        screen.blit(fade_surface, (0, 0))
-        pygame.display.flip()
-        clock.tick(60)
-
-        if t >= 1:
-            break
-
-
 
 
 # Playerplayer_rect = pyg
@@ -153,13 +86,13 @@ last_hit = -9999
 player_frame = 0.0
 animation_speed= 0.001
 
-door_img = pygame.image.load("img\door3.jpg").convert_alpha()
+door_img = pygame.image.load("projectweek-09-whomp-whomp\img\door3.jpg").convert_alpha()
 door_img = pygame.transform.scale(door_img, (80, 100))  # pas grootte aan
 
 bedroom_bg = pygame.image.load("projectweek-09-whomp-whomp/img/bedroom.png").convert_alpha()
 bedroom_bg = pygame.transform.scale(bedroom_bg, (ROOM_WIDTH, ROOM_HEIGHT))  # full-room background
 
-torture_bg = pygame.image.load("projectweek-09-whomp-whomp\img\Torture chamber.png").convert_alpha()
+torture_bg = pygame.image.load("projectweek-09-whomp-whomp\img\Torture_chamber.png").convert_alpha()
 torture_bg = pygame.transform.scale(torture_bg, (ROOM_WIDTH, ROOM_HEIGHT))
 
 library_bg = pygame.image.load("projectweek-09-whomp-whomp\img\library.png").convert_alpha()
@@ -168,10 +101,10 @@ library_bg = pygame.transform.scale(library_bg, (ROOM_WIDTH, ROOM_HEIGHT))
 basement_bg = pygame.image.load("projectweek-09-whomp-whomp/img/basement.png").convert_alpha()
 basement_bg = pygame.transform.scale(basement_bg, (ROOM_WIDTH, ROOM_HEIGHT))
 
-start_bg = pygame.image.load(("img\Startscherm.jpg")).convert_alpha()
+start_bg = pygame.image.load(("projectweek-09-whomp-whomp\img\Startscherm.jpg")).convert_alpha()
 start_bg = pygame.transform.scale(start_bg, (WIDTH, HEIGHT))
 
-floor_bg = pygame.image.load(("img\stone.jpg")).convert_alpha()
+floor_bg = pygame.image.load(("projectweek-09-whomp-whomp\img\stone.jpg")).convert_alpha()
 floor_bg = pygame.transform.scale(floor_bg, (WIDTH, HEIGHT))
 
 corridor_bg = pygame.image.load("projectweek-09-whomp-whomp/img/corridor.png").convert_alpha()
@@ -179,21 +112,13 @@ corridor_bg = pygame.transform.scale(corridor_bg, (ROOM_WIDTH, ROOM_HEIGHT))
 
 
 frame_width, frame_height = 64, 64
-<<<<<<< HEAD
-player_spritesheet = pygame.image.load("img\player.png").convert_alpha()
-=======
 player_spritesheet = pygame.image.load("projectweek-09-whomp-whomp\img\character-spritesheet (2).png").convert_alpha()
->>>>>>> c7ac289450cadfaa83b5afda3ec71cffefa4e1ef
 
-skeleton_spritesheet = pygame.image.load("img\\skeleton.png").convert_alpha()
+skeleton_spritesheet = pygame.image.load("projectweek-09-whomp-whomp\\img\\skeleton.png").convert_alpha()
 frame_width, frame_height = 64, 64  # pas aan naar de juiste grootte van één frame
 skeleton_img = skeleton_spritesheet.subsurface(pygame.Rect(0, 0, frame_width, frame_height))
 skeleton_frames = load_skeleton_frames(skeleton_spritesheet, frame_width, frame_height)
 
-<<<<<<< HEAD
-# buy_sound = pygame.mixer.Sound("sounds/buy_1.wav")
-# buy_sound.set_volume(0.6)
-=======
 skeleton_spritesheet = pygame.image.load("projectweek-09-whomp-whomp/img/skeleton.png").convert_alpha()
 werewolf_sheet = pygame.image.load("projectweek-09-whomp-whomp/img/werewolf.png").convert_alpha()
 zombie_sheet = pygame.image.load("projectweek-09-whomp-whomp/img/zombie2.png").convert_alpha()
@@ -218,10 +143,9 @@ zombie_frames = remove_blank_frames(
 
 buy_sound = pygame.mixer.Sound("projectweek-09-whomp-whomp/sounds/buy_1.wav")
 buy_sound.set_volume(0.6)
->>>>>>> c7ac289450cadfaa83b5afda3ec71cffefa4e1ef
 
-# error_sound = pygame.mixer.Sound("sounds/buy_1.wav")  # tijdelijk zelfde sound
-# error_sound.set_volume(0.4)
+error_sound = pygame.mixer.Sound("projectweek-09-whomp-whomp/sounds/buy_1.wav")  # tijdelijk zelfde sound
+error_sound.set_volume(0.4)
 
 dodge_sound = pygame.mixer.Sound(
     "projectweek-09-whomp-whomp\sounds\swoosh-sound-effects.wav"
@@ -230,7 +154,7 @@ dodge_sound.set_volume(0.7)
 
 
 enemy_death_sound = pygame.mixer.Sound(
-    "projectweek-09-whomp-whomp\sounds\enemy-duck-death-mp3.wav"
+    "projectweek-09-whomp-whomp\sounds\death_sound.wav"
 )
 enemy_death_sound.set_volume(0.6)
 
@@ -242,7 +166,7 @@ footstep_sound.set_volume(0.4)
 footstep_channel = pygame.mixer.Channel(1)
 
 spear_attack_sound = pygame.mixer.Sound(
-    "projectweek-09-whomp-whomp\sounds\spear_thrust-1-382402 (mp3cut.net).wav"
+    "projectweek-09-whomp-whomp\sounds\spear_sound.wav"
 )
 spear_attack_sound.set_volume(0.5)
 
@@ -494,7 +418,58 @@ rooms["starting_room"]["doors"].append({
 })
 
 
+# for i, room_name in enumerate(HAUNTED_ROOMS):
+#     rooms[room_name] = {
+#         "color": (
+#             random.randint(40, 180),
+#             random.randint(40, 180),
+#             random.randint(40, 180)
+#         ),
+#         "doors": [],
+#         "enemies": make_enemies(random.randint(2, 5))
+
+#     }
+#     if room_name == "abandoned_bedroom":
+#         rooms[room_name]["bg"] = bedroom_bg
+#     if room_name == "torture_chamber":
+#         rooms[room_name]["bg"] = torture_bg
+#     if room_name == "creepy_library":
+#         rooms[room_name]["bg"] = library_bg
+#     if room_name == "spider_corridor":
+#         rooms[room_name]["bg"] = corridor_bg
+#     if room_name == "dark_basement":
+#         rooms[room_name]["bg"] = basement_bg
+
+
+
+
+
+#     # deur terug naar vorige room
+#     if i == 0:
+#         back_target = "starting_room"
+#     else:
+#         back_target = HAUNTED_ROOMS[i - 1]
+
+#     back_door = random_door_rect("left")
+#     rooms[room_name]["doors"].append({
+#         "rect": back_door,
+#         "target": back_target,
+#         "spawn": spawn_from_door(back_door)
+#     })
+
+#     # deur naar volgende room (behalve laatste)
+#     if i < len(HAUNTED_ROOMS) - 1:
+#         next_door = random_door_rect("right")
+#         rooms[room_name]["doors"].append({
+#             "rect": next_door,
+#             "target": HAUNTED_ROOMS[i + 1],
+#             "spawn": spawn_from_door(next_door)
+#         })
+#         room_number = i + 1  # 1..20
+
 for i, room_name in enumerate(HAUNTED_ROOMS):
+    room_number = i + 1  # 1..20  ✅ altijd correct
+
     rooms[room_name] = {
         "color": (
             random.randint(40, 180),
@@ -503,37 +478,9 @@ for i, room_name in enumerate(HAUNTED_ROOMS):
         ),
         "doors": [],
         "enemies": make_enemies(random.randint(2, 5))
-
     }
-    if room_name == "abandoned_bedroom":
-        rooms[room_name]["bg"] = bedroom_bg
-    if room_name == "torture_chamber":
-        rooms[room_name]["bg"] = torture_bg
-    if room_name == "creepy_library":
-        rooms[room_name]["bg"] = library_bg
-    if room_name == "spider_corridor":
-        rooms[room_name]["bg"] = corridor_bg
-    if room_name == "dark_basement":
-        rooms[room_name]["bg"] = basement_bg
 
-
-
-
-
-    # deur terug naar vorige room
-    if i == 0:
-        back_target = "starting_room"
-    else:
-        back_target = HAUNTED_ROOMS[i - 1]
-
-    back_door = random_door_rect("left")
-    rooms[room_name]["doors"].append({
-        "rect": back_door,
-        "target": back_target,
-        "spawn": spawn_from_door(back_door)
-    })
-
-    # deur naar volgende room (behalve laatste)
+    ...
     if i < len(HAUNTED_ROOMS) - 1:
         next_door = random_door_rect("right")
         rooms[room_name]["doors"].append({
@@ -541,7 +488,7 @@ for i, room_name in enumerate(HAUNTED_ROOMS):
             "target": HAUNTED_ROOMS[i + 1],
             "spawn": spawn_from_door(next_door)
         })
-        room_number = i + 1  # 1..20
+
 
     if room_number in BOSS_ROOM_NUMBERS:
         boss_type = BOSS_ROOM_NUMBERS[room_number]
@@ -555,6 +502,16 @@ for i, room_name in enumerate(HAUNTED_ROOMS):
         # extra minions bij final boss (optioneel)
         if boss_type == "final_boss":
             rooms[room_name]["enemies"] += make_enemies(3)
+
+            # ✅ extra shop deur in boss rooms (altijd open)
+        boss_shop_door = random_door_rect("bottom")
+        rooms[room_name]["doors"].append({
+            "rect": boss_shop_door,
+            "target": "shop_room",
+            "spawn": spawn_from_door(boss_shop_door),
+            "always_open": True
+    })
+
 
 
 current_room = "starting_room"
@@ -574,8 +531,10 @@ back_door = random_door_rect("top")
 rooms["shop_room"]["doors"].append({
     "rect": back_door,
     "target": "starting_room",
-    "spawn": spawn_from_door(back_door)
+    "spawn": spawn_from_door(back_door),
+    "is_return": True
 })
+
 
 def show_info_screen():
     info_lines = [
@@ -590,8 +549,8 @@ def show_info_screen():
         "- Shop vind je via de deur in de starting room (onderaan).",
         "",
         "BESTURING:",
-        "- Bewegen: WASD of pijltjes",
-        "- Aanvallen: SPACE",
+        "- Bewegen: zqsd of pijltjes",
+        "- Aanvallen: SPACE of linker muisklik",
         "- Dodge: LEFT SHIFT (heeft cooldown)",
         "- Menu: M",
         "- Shop: E = heal, R = damage, T = max HP, ESC = weg",
@@ -750,8 +709,8 @@ def draw_menu():
             f"Tokens: {tokens}",
             "",
             "CONTROLS:",
-            "Move: WASD / Arrow Keys",
-            "Attack: SPACE",
+            "Move: zqsd / Arrow Keys",
+            "Attack: SPACE or left mouse button",
             "Interact: E",
             "Menu: M",
             "",
@@ -926,7 +885,7 @@ def handle_input(keys):
     vx = vy = 0
     moving = False
 
-    if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+    if keys[pygame.K_LEFT] or keys[pygame.K_q]:
         vx = -player_speed
         player_dir = "left"
         moving = True
@@ -936,7 +895,7 @@ def handle_input(keys):
         player_dir = "right"
         moving = True
 
-    if keys[pygame.K_UP] or keys[pygame.K_w]:
+    if keys[pygame.K_UP] or keys[pygame.K_z]:
         vy = -player_speed
         player_dir = "up"
         moving = True
@@ -1159,9 +1118,12 @@ def process_collisions(keys):
         if player_rect.colliderect(d["rect"]):
 
             # ❌ deur geblokkeerd als enemies leven
-            if not room_cleared(current_room) and current_room != "starting_room":
+            if (not room_cleared(current_room)
+                and current_room != "starting_room"
+                and not d.get("always_open", False)):
                 draw_center_message("Kill all enemies first!")
                 return
+
 
             # ✅ DIRECT door de deur
             switch_room(d["target"], d["spawn"])
@@ -1173,22 +1135,23 @@ def process_collisions(keys):
 def switch_room(target, spawn=None):
     global current_room
 
-    # fade-out op het huidige beeld (jij tekent al vóór collisions, dus dit werkt mooi)
-    fade_out()
+    # ✅ Als we de shop in gaan: stel de return-deur in naar de kamer waar we vandaan komen
+    if target == "shop_room":
+        prev_room = current_room
+        prev_pos = player_rect.center  # terug naar waar je stond
 
-    # wissel kamer + spawn
+        for door in rooms["shop_room"]["doors"]:
+            if door.get("is_return", False):
+                door["target"] = prev_room
+                door["spawn"] = safe_spawn(prev_pos)
+                break
+
     current_room = target
+
     if spawn:
         player_rect.center = safe_spawn(spawn)
     else:
         player_rect.center = (ROOM_WIDTH // 2, ROOM_HEIGHT // 2)
-
-    # teken 1 frame van de nieuwe kamer (onder de fade)
-    render_scene_for_transition()
-    pygame.display.flip()
-
-    # fade-in naar nieuwe kamer
-    fade_in()
 
 
 
@@ -1524,6 +1487,11 @@ while running:
 
             if ev.key == pygame.K_m:
                 menu_open = not menu_open
+
+        elif ev.type == pygame.MOUSEBUTTONDOWN:
+            if ev.button == 1 and not menu_open:  # 1 = linker muisknop
+                try_attack()
+
 
 
 
