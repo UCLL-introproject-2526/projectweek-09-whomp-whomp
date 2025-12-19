@@ -26,6 +26,7 @@ blink_interval = 80  # ms tussen aan/uit
 
 
 
+
 WIDTH, HEIGHT = 900, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Hotel Transylvania")
@@ -48,6 +49,11 @@ YELLOW = (230,200,60)
 BROWN = (120,80,40)
 DARK = (20,10,22)
 
+# --- ROOM TRANSITION (fade) ---
+FADE_MS = 220
+fade_surface = pygame.Surface((WIDTH, HEIGHT))
+fade_surface.fill((0, 0, 0))
+
 def load_skeleton_frames(sheet, frame_w, frame_h):
     frames = []
     sheet_width, sheet_height = sheet.get_size()
@@ -67,6 +73,60 @@ def remove_blank_frames(frames, min_alpha=1):
         if r.width > 0 and r.height > 0:
             cleaned.append(f)
     return cleaned
+
+
+def render_scene_for_transition():
+    """Teken 1 frame van de huidige game-state (zonder collision/updates)."""
+    draw_room()
+    draw_player()
+    draw_hud()
+    draw_top_right_info()
+    draw_level_indicator()
+    if DEBUG:
+        draw_debug_hud()
+
+def fade_out(duration_ms=FADE_MS):
+    start = pygame.time.get_ticks()
+    while True:
+        # window responsive houden
+        for ev in pygame.event.get():
+            if ev.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+        t = (pygame.time.get_ticks() - start) / duration_ms
+        if t >= 1:
+            t = 1
+
+        alpha = int(255 * t)
+        fade_surface.set_alpha(alpha)
+        screen.blit(fade_surface, (0, 0))
+        pygame.display.flip()
+        clock.tick(60)
+
+        if t >= 1:
+            break
+
+def fade_in(duration_ms=FADE_MS):
+    start = pygame.time.get_ticks()
+    while True:
+        for ev in pygame.event.get():
+            if ev.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+        t = (pygame.time.get_ticks() - start) / duration_ms
+        if t >= 1:
+            t = 1
+
+        alpha = int(255 * (1 - t))
+        fade_surface.set_alpha(alpha)
+        screen.blit(fade_surface, (0, 0))
+        pygame.display.flip()
+        clock.tick(60)
+
+        if t >= 1:
+            break
 
 
 
@@ -1096,11 +1156,24 @@ def process_collisions(keys):
 
 def switch_room(target, spawn=None):
     global current_room
+
+    # fade-out op het huidige beeld (jij tekent al vóór collisions, dus dit werkt mooi)
+    fade_out()
+
+    # wissel kamer + spawn
     current_room = target
     if spawn:
         player_rect.center = safe_spawn(spawn)
     else:
         player_rect.center = (ROOM_WIDTH // 2, ROOM_HEIGHT // 2)
+
+    # teken 1 frame van de nieuwe kamer (onder de fade)
+    render_scene_for_transition()
+    pygame.display.flip()
+
+    # fade-in naar nieuwe kamer
+    fade_in()
+
 
 
 
