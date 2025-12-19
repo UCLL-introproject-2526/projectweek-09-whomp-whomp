@@ -38,7 +38,7 @@ WALL_THICKNESS = 30
 
 ROOM_WIDTH, ROOM_HEIGHT = 1800, 1200
 
-ui = pygame.font.SysFont(None, 32)
+ui = pygame.font.SysFont(None, 26)
 title = pygame.font.SysFont(None, 56)
 info_font = pygame.font.SysFont(None, 22)
 hint_font = pygame.font.SysFont(None, 44)
@@ -726,19 +726,22 @@ def draw_menu():
     overlay.fill((10, 10, 20))
     screen.blit(overlay, (0, 0))
 
-    title_text = title.render("HAUNTED HOUSE", True, WHITE)
-    screen.blit(title_text, title_text.get_rect(center=(WIDTH//2, 80)))
+    # Titel aanpassen afhankelijk van game over
+    menu_title = "GAME OVER" if hp <= 0 else "HAUNTED HOUSE"
+    title_text = title.render(menu_title, True, WHITE)
+    screen.blit(title_text, title_text.get_rect(center=(WIDTH // 2, 80)))
 
     info_lines = []
 
     # GAME OVER TEKST
     if hp <= 0:
-        info_lines.append(f"Jammer {player_name},")
-        info_lines.append("je bent doodgegaan.")
-        info_lines.append("")
-        info_lines.append("Druk R om opnieuw te beginnen")
-        info_lines.append("of ESC om te stoppen")
-
+        info_lines.extend([
+            f"Jammer {player_name},",
+            "je bent doodgegaan.",
+            "",
+            "Druk R om opnieuw te beginnen",
+            "of ESC om te stoppen"
+        ])
     else:
         info_lines.extend([
             f"Player: {player_name}",
@@ -747,6 +750,7 @@ def draw_menu():
             "CONTROLS:",
             "Move: zqsd / Arrow Keys",
             "Attack: SPACE or left mouse button",
+            "Dodge: LEFT SHIFT",
             "Interact: E",
             "Menu: M",
             "",
@@ -761,11 +765,17 @@ def draw_menu():
             "M  - Close menu"
         ])
 
-    y = 160
+    # ✅ ALTIJD tekenen (ook bij hp <= 0)
+    y = 140
+    line_h = 20
+    blank_h = 10
+
     for line in info_lines:
         txt = ui.render(line, True, WHITE)
-        screen.blit(txt, (WIDTH//2 - txt.get_width()//2, y))
-        y += 28
+        screen.blit(txt, (WIDTH // 2 - txt.get_width() // 2, y))
+        y += blank_h if line == "" else line_h
+
+
 
 
 
