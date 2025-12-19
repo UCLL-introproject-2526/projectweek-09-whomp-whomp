@@ -392,6 +392,14 @@ def random_door_rect(side, width=70, height=100):
 
     return pygame.Rect(x, y, width, height)
 
+MAX_NORMAL_ENEMIES = 8  # max aantal enemies in normale rooms
+
+def enemies_for_room(room_number: int) -> int:
+    # Room 1 = 2 enemies, room 2 = 3, room 3 = 4, ...
+    # maar capped op MAX_NORMAL_ENEMIES
+    return min(2 + (room_number - 1), MAX_NORMAL_ENEMIES)
+
+
 def spawn_from_door(door_rect, offset=120):
     if door_rect.top == WALL_THICKNESS:
         return (door_rect.centerx, door_rect.bottom + offset)
@@ -506,6 +514,7 @@ rooms["starting_room"]["doors"].append({
 #             "spawn": spawn_from_door(next_door)
 #         })
 #         room_number = i + 1  # 1..20
+
 
 for i, room_name in enumerate(HAUNTED_ROOMS):
     room_number = i + 1  # 1..20  ✅ altijd correct
@@ -1280,12 +1289,23 @@ def switch_room(target, spawn=None):
 def enemies_remaining():
     return sum(1 for e in rooms[current_room]["enemies"] if e["hp"] > 0)
 
+def max_enemy_damage_in_room():
+    if current_room == "shop_room":
+        return 0
+    alive = [e for e in rooms[current_room]["enemies"] if e["hp"] > 0]
+    if not alive:
+        return 0
+    return max(e.get("damage", 0) for e in alive)
+
+
 def draw_top_right_info():
     lines = [
         "M : Menu",
         f"Enemies: {enemies_remaining()}",
+        f"Enemy dmg: {max_enemy_damage_in_room()}",
         "Dodge"
     ]
+
 
     padding = 10
     line_height = 24
