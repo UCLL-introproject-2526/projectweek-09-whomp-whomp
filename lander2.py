@@ -1,4 +1,4 @@
-import pygame, math, random, json, os, time
+import pygame, math, random, json, os, time, sys
 
 # ================= CONFIG =================
 WIDTH, HEIGHT = 1280, 720
@@ -30,23 +30,19 @@ clock = pygame.time.Clock()
 font = pygame.font.SysFont("Arial", 20)
 bigfont = pygame.font.SysFont("Arial", 48, bold=True)
 
-# ================= MAP =================
 def make_dungeon():
     dungeon = [[1]*MAP_SIZE for _ in range(MAP_SIZE)]
     rooms = []
-
     def carve(x,y,w,h):
         for yy in range(y,y+h):
             for xx in range(x,x+w):
                 dungeon[yy][xx] = 0
-
     def corridor(a,b):
         x1,y1=a; x2,y2=b
         for x in range(min(x1,x2),max(x1,x2)+1):
             dungeon[y1][x]=0
         for y in range(min(y1,y2),max(y1,y2)+1):
             dungeon[y][x2]=0
-
     for _ in range(8):
         w,h=random.randint(4,7),random.randint(4,7)
         x=random.randint(1,MAP_SIZE-w-2)
@@ -55,7 +51,6 @@ def make_dungeon():
         c=(x+w//2,y+h//2)
         if rooms: corridor(rooms[-1],c)
         rooms.append(c)
-
     return dungeon, rooms
 
 def mapping(x,y): return int(x//TILE), int(y//TILE)
@@ -64,12 +59,11 @@ def normalize(a):
     while a<-math.pi: a+=2*math.pi
     return a
 
-# ================= GAME INIT =================
 def new_game():
     global room_map, rooms, px, py, angle
     global enemies, bullets, spells, inventory
     global hp, score, treasure_x, treasure_y, last_hit_time
-    global game_over, victory, boss, shop_open, tokens
+    global game_over, victory, boss, shop_open, tokens, safety_until
 
     room_map, rooms = make_dungeon()
     px=(rooms[0][0]+0.5)*TILE
@@ -83,6 +77,7 @@ def new_game():
     game_over = False
     victory = False
     shop_open = False
+    safety_until = time.time() + 30  # 30 seconden veiligheid
 
     inventory={"potions":2, "bow":True}
 
@@ -105,7 +100,6 @@ def new_game():
                 "death_time":None
             })
 
-    # Boss in laatste kamer
     boss_room = rooms[-1]
     boss = {
         "x": (boss_room[0]+0.5)*TILE,
@@ -172,8 +166,6 @@ def shoot():
 def show_start_screen():
     screen.fill(DARK)
     title = bigfont.render("3D Dungeon", True, GOLD)
-    screen.blit(title, (WIDTH//2-title.get_width()//2, 80))
-    y = 180
     lines = [
         "Welcome to the 3D Dungeon!",
         "",
@@ -185,6 +177,7 @@ def show_start_screen():
         "  - I: Drink Potion (heal 2 HP)",
         "  - B: Open Shop (2 tokens = 5 HP)",
         "  - R: Restart Dungeon",
+        "  - ) : Quit Game",
         "",
         "Mechanics:",
         "  - Defeat all enemies (including the orange boss) to unlock the treasure.",
@@ -192,30 +185,52 @@ def show_start_screen():
         "  - Use potions to heal. Score increases for each enemy.",
         "  - Use the bow for ranged attacks.",
         "",
-        "Enter your name and press ENTER to start!"
+        "Enter your name and press E to start!"
     ]
-    for line in lines:
-        surf = font.render(line, True, WHITE if line else GOLD)
-        screen.blit(surf, (WIDTH//2-surf.get_width()//2, y))
-        y += 32 if line else 16
-    # Naam invoer
+    scroll = 0
+    max_scroll = max(0, len(lines)*32 + 80 - (HEIGHT-120))
     name = ""
     input_active = True
     while input_active:
+        screen.fill(DARK)
+        screen.blit(title, (WIDTH//2-title.get_width()//2, 40))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit(); sys.exit()
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN and name:
+                if ((event.key == pygame.K_e) or (event.unicode and event.unicode.lower() == 'e')) and name:
                     input_active = False
                 elif event.key == pygame.K_BACKSPACE:
                     name = name[:-1]
+                elif event.key == pygame.K_DOWN:
+                    scroll = min(scroll+32, max_scroll)
+                elif event.key == pygame.K_UP:
+                    scroll = max(scroll-32, 0)
+                elif event.key == pygame.K_RIGHTPAREN:
+                    pygame.quit(); sys.exit()
                 elif event.key <= 127 and len(name) < 16:
                     if event.unicode.isprintable() and (event.unicode.isalnum() or event.unicode == " "):
                         name += event.unicode
-        pygame.draw.rect(screen, DARK, (WIDTH//2-200, y+10, 400, 40))
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 4:  # scroll up
+                    scroll = max(scroll-32, 0)
+                if event.button == 5:  # scroll down
+                    scroll = min(scroll+32, max_scroll)
+        y = 120 - scroll
+        for line in lines:
+            surf = font.render(line, True, WHITE if line else GOLD)
+            screen.blit(surf, (WIDTH//2-surf.get_width()//2, y))
+            y += 32 if line else 16
+        pygame.draw.rect(screen, DARK, (WIDTH//2-200, HEIGHT-70, 400, 40))
         name_surf = font.render(name, True, WHITE)
-        screen.blit(name_surf, (WIDTH//2-name_surf.get_width()//2, y+20))
+        screen.blit(name_surf, (WIDTH//2-name_surf.get_width()//2, HEIGHT-60))
+        name_label = font.render("Your name:", True, GOLD)
+        screen.blit(name_label, (WIDTH//2-name_label.get_width()//2, HEIGHT-90))
+        if max_scroll > 0:
+            bar_h = int((HEIGHT-160) * (HEIGHT-120)/(len(lines)*32+80))
+            bar_y = int(120 + (HEIGHT-160-bar_h) * scroll / max_scroll)
+            pygame.draw.rect(screen, GRAY, (WIDTH-30, 120, 12, HEIGHT-160), border_radius=6)
+            pygame.draw.rect(screen, GOLD, (WIDTH-30, bar_y, 12, bar_h), border_radius=6)
         pygame.display.flip()
     return name
 
@@ -249,7 +264,6 @@ def show_end_screen(victory, name, score):
     screen.blit(msg, (WIDTH//2-msg.get_width()//2, HEIGHT//2-60))
     score_surf = font.render(f"Score: {score}", True, WHITE)
     screen.blit(score_surf, (WIDTH//2-score_surf.get_width()//2, HEIGHT//2-20))
-    # Scoreboard
     sb_title = font.render("Top 3 Scores (local):", True, GOLD)
     screen.blit(sb_title, (WIDTH//2-sb_title.get_width()//2, HEIGHT//2+30))
     y = HEIGHT//2+60
@@ -259,7 +273,7 @@ def show_end_screen(victory, name, score):
         sb_line = font.render(f"{i+1}. {entry['name']} - {entry['score']}", True, color)
         screen.blit(sb_line, (WIDTH//2-sb_line.get_width()//2, y))
         y += 30
-    hint = font.render("Press ENTER to play again or ESC to quit", True, GOLD)
+    hint = font.render("Press E to play again, ) to quit", True, GOLD)
     screen.blit(hint, (WIDTH//2-hint.get_width()//2, y+20))
     pygame.display.flip()
     waiting = True
@@ -268,9 +282,9 @@ def show_end_screen(victory, name, score):
             if event.type == pygame.QUIT:
                 pygame.quit(); sys.exit()
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN:
+                if (event.key == pygame.K_e) or (event.unicode and event.unicode.lower() == 'e'):
                     waiting = False
-                if event.key == pygame.K_ESCAPE:
+                if event.key == pygame.K_RIGHTPAREN:
                     pygame.quit(); sys.exit()
 
 def show_shop(tokens, hp):
@@ -283,11 +297,10 @@ def show_shop(tokens, hp):
     screen.blit(info, (WIDTH//2-info.get_width()//2, 260))
     tokens_surf = font.render(f"Tokens: {tokens}   HP: {hp}", True, WHITE)
     screen.blit(tokens_surf, (WIDTH//2-tokens_surf.get_width()//2, 320))
-    esc = font.render("Press ESC to close shop", True, WHITE)
+    esc = font.render("Press ESC to close shop, ) to quit", True, WHITE)
     screen.blit(esc, (WIDTH//2-esc.get_width()//2, 370))
     pygame.display.flip()
 
-# ================= RAYCAST + FLOOR =================
 def cast_rays_and_floor():
     for y in range(HEIGHT//2, HEIGHT, 2):
         for x in range(0, WIDTH, 2):
@@ -329,7 +342,6 @@ def draw_sprite_3d(x,y,color,scale=1):
         sy=HEIGHT//2-size//2
         pygame.draw.rect(screen,color,(int(sx),int(sy),int(size//2),int(size)))
 
-# ================= MAIN LOOP =================
 player_name = None
 while True:
     new_game()
@@ -355,23 +367,22 @@ while True:
                         hp=min(5,hp+2); inventory["potions"]-=1
                     if e.key==pygame.K_r: new_game(); player_name = None; running = False
                     if e.key==pygame.K_b: shop_open = True
+                    if e.key==pygame.K_RIGHTPAREN: pygame.quit(); sys.exit()
                 else:
                     if e.key==pygame.K_h and tokens >= 2 and hp > 0:
                         hp += 5
                         tokens -= 2
                     if e.key==pygame.K_ESCAPE:
                         shop_open = False
-            if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE and not shop_open:
-                pygame.quit(); sys.exit()
+                    if e.key==pygame.K_RIGHTPAREN:
+                        pygame.quit(); sys.exit()
 
-        # Muisrotatie (vrij, FPS-stijl)
         mx, my = pygame.mouse.get_rel()
         angle += mx * MOUSE_SENS
 
         keys=pygame.key.get_pressed()
         sp=220*dt; rot=2.8*dt
 
-        # Strafing (A/D of Q/E)
         move_x = 0
         if keys[pygame.K_a] or keys[pygame.K_q]: move_x -= 1
         if keys[pygame.K_d] or keys[pygame.K_e]: move_x += 1
@@ -381,20 +392,18 @@ while True:
         if keys[pygame.K_DOWN] or keys[pygame.K_s]: move_y -= 1
 
         if not shop_open:
-            # Voor/achteruit
             if move_y != 0:
                 nx=px+math.cos(angle)*sp*move_y
                 ny=py+math.sin(angle)*sp*move_y
                 if player_can_move(nx, ny):
                     px,py=nx,ny
-            # Strafing
             if move_x != 0:
                 nx=px+math.cos(angle+math.pi/2)*sp*move_x
                 ny=py+math.sin(angle+math.pi/2)*sp*move_x
                 if player_can_move(nx, ny):
                     px,py=nx,ny
 
-        # bullets
+        sprites=[]
         for b in bullets[:]:
             b["x"]+=math.cos(b["a"])*500*dt
             b["y"]+=math.sin(b["a"])*500*dt
@@ -418,7 +427,6 @@ while True:
                         bullets.remove(b)
                     break
 
-        # enemies + respawn
         for en in enemies:
             if not en["alive"]:
                 if en["death_time"] and time.time() - en["death_time"] > 30:
@@ -427,8 +435,8 @@ while True:
                     en["alive"] = True
                     en["death_time"] = None
                 continue
-            if shop_open:
-                continue  # Speler is veilig in shop, vijanden bewegen/aanvallen niet
+            if shop_open or time.time() < safety_until:
+                continue
             dx,dy=px-en["x"],py-en["y"]
             d=math.hypot(dx,dy)
             attack_dist = 40
@@ -444,11 +452,9 @@ while True:
                 if enemy_can_move(ex, ey):
                     en["x"], en["y"] = ex, ey
 
-        # ===== RENDER =====
         screen.fill(DARK)
         cast_rays_and_floor()
 
-        sprites=[]
         for e in enemies:
             if e["alive"]:
                 color = ORANGE if e.get("boss",False) else RED
@@ -460,18 +466,22 @@ while True:
             sprites.append((math.hypot(b["x"]-px,b["y"]-py),
                             lambda b=b: draw_sprite_3d(b["x"],b["y"],WHITE,0.5)))
 
-        for _,draw in sorted(sprites, reverse=True):
+        for _,draw in sorted(sprites, key=lambda t: t[0], reverse=True):
             draw()
 
         screen.blit(font.render(f"HP:{hp}  Tokens:{tokens}  Score:{score}",True,WHITE),(10,10))
-        screen.blit(font.render("SPACE Melee | F Bow | I Potion | B Shop | R Restart | Mouse: Look",True,WHITE),(10,HEIGHT-30))
+        screen.blit(font.render("SPACE Melee | F Bow | I Potion | B Shop | R Restart | ) Quit | Mouse: Look",True,WHITE),(10,HEIGHT-30))
+
+        if time.time() < safety_until:
+            left = int(safety_until - time.time())
+            safe_surf = font.render(f"SAFE: {left}s", True, (0,255,0))
+            screen.blit(safe_surf, (WIDTH//2-safe_surf.get_width()//2, 10))
 
         if shop_open:
             show_shop(tokens, hp)
 
         pygame.display.flip()
 
-        # Check win/lose
         all_dead = all(not e["alive"] for e in enemies)
         player_on_treasure = math.hypot(px-treasure_x, py-treasure_y) < 32
         if all_dead and player_on_treasure and hp > 0:
